@@ -6,8 +6,8 @@ use eframe::egui;
 
 use crate::i18n::Lang;
 use crate::worker::{
-    self, ChipBrandInfo, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo, TargetSummary,
-    WorkerCommand, WorkerEvent,
+    self, BootMode, ChipBrandInfo, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo,
+    TargetSummary, WorkerCommand, WorkerEvent,
 };
 
 #[derive(Clone, Copy)]
@@ -40,6 +40,7 @@ pub struct ProbeUiApp {
     selected_probe: usize,
     probing: bool,
     connecting: bool,
+    boot_mode: BootMode,
 
     connected: Option<TargetSummary>,
     manual_target: String,
@@ -103,6 +104,7 @@ impl ProbeUiApp {
             selected_probe: 0,
             probing: true,
             connecting: false,
+            boot_mode: BootMode::Normal,
             connected: None,
             manual_target: String::new(),
             chip_families,
@@ -487,6 +489,39 @@ impl eframe::App for ProbeUiApp {
 
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
+                    ui.label(self.t("连接方式:", "Connection mode:"));
+                    egui::ComboBox::from_id_salt("boot_mode_sel")
+                        .width(200.0)
+                        .selected_text(match self.boot_mode {
+                            BootMode::Normal => self.t("正常连接", "Normal"),
+                            BootMode::UnderReset => self.t("复位期间连接", "Under Reset"),
+                        })
+                        .show_ui(ui, |ui| {
+                            let l_normal = self.t("正常连接", "Normal");
+                            let l_under_reset = self.t("复位期间连接", "Under Reset");
+                            ui.selectable_value(
+                                &mut self.boot_mode,
+                                BootMode::Normal,
+                                l_normal,
+                            );
+                            ui.selectable_value(
+                                &mut self.boot_mode,
+                                BootMode::UnderReset,
+                                l_under_reset,
+                            );
+                        });
+                });
+                ui.label(
+                    egui::RichText::new(self.t(
+                        "正常连接：从主 Flash 启动（BOOT0=0）；复位期间连接：保持目标复位直至连接完成（常用于 BOOT0 拉高从系统存储器启动等场景）",
+                        "Normal: boot from main flash (BOOT0=0); Under Reset: keep the target in reset until connected (e.g. booting from system memory with BOOT0 high)",
+                    ))
+                    .small()
+                    .weak(),
+                );
+
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
                     let has_probe = !self.probes.is_empty()
                         && !self.connecting
                         && !self.probing
@@ -512,6 +547,7 @@ impl eframe::App for ProbeUiApp {
                         ));
                         self.send(WorkerCommand::ConnectAuto {
                             probe: self.selected_probe,
+                            boot_mode: self.boot_mode,
                         });
                     }
                     let connected = self.connected.is_some() && !self.busy;
@@ -809,6 +845,7 @@ impl eframe::App for ProbeUiApp {
                     self.send(WorkerCommand::ConnectManual {
                         probe: self.selected_probe,
                         target,
+                        boot_mode: self.boot_mode,
                     });
                 }
                 ui.add_space(4.0);

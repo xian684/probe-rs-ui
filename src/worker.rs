@@ -56,11 +56,21 @@ pub enum OpState {
     Failed,
 }
 
+/// 连接方式（对应 STM32 BOOT0/BOOT1 启动配置场景）。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BootMode {
+    /// 正常连接，直接从主 Flash 启动（BOOT0 = 0）。
+    Normal,
+    /// 复位期间连接，通过探针保持目标复位直至协议初始化完成，
+    /// 常用于目标程序干扰 SWD 或 BOOT0 拉高从系统存储器启动的场景。
+    UnderReset,
+}
+
 /// 发送给后台工作线程的命令。
 pub enum WorkerCommand {
     Scan,
-    ConnectAuto { probe: usize },
-    ConnectManual { probe: usize, target: String },
+    ConnectAuto { probe: usize, boot_mode: BootMode },
+    ConnectManual { probe: usize, target: String, boot_mode: BootMode },
     Flash {
         path: PathBuf,
         do_chip_erase: bool,
@@ -326,17 +336,8 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     let _ = events.send(WorkerEvent::Probes(Err(e)));
                 }
             },
-            WorkerCommand::ConnectAuto { probe } => match connect(&probes, probe, None, lang) {
-                Ok((s, summary)) => {
-                    session = Some(s);
-                    let _ = events.send(WorkerEvent::Connected(Ok(summary)));
-                }
-                Err(e) => {
-                    let _ = events.send(WorkerEvent::Connected(Err(e)));
-                }
-            },
-            WorkerCommand::ConnectManual { probe, target } => {
-                match connect(&probes, probe, Some(target), lang) {
+            WorkerCommand::ConnectAuto { probe, boot_mode } => {
+                match connect(&probes, probe, None, boot_mode, lang) {
                     Ok((s, summary)) => {
                         session = Some(s);
                         let _ = events.send(WorkerEvent::Connected(Ok(summary)));
@@ -346,6 +347,19 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     }
                 }
             }
+            WorkerCommand::ConnectManual {
+                probe,
+                target,
+                boot_mode,
+            } => match connect(&probes, probe, Some(target), boot_mode, lang) {
+                Ok((s, summary)) => {
+                    session = Some(s);
+                    let _ = events.send(WorkerEvent::Connected(Ok(summary)));
+                }
+                Err(e) => {
+                    let _ = events.send(WorkerEvent::Connected(Err(e)));
+                }
+            },
             WorkerCommand::Flash {
                 path,
                 do_chip_erase,
@@ -561,6 +575,7 @@ fn connect(
     probes: &[DebugProbeInfo],
     index: usize,
     target: Option<String>,
+    boot_mode: BootMode,
     lang: Lang,
 ) -> Result<(Session, TargetSummary), String> {
     let info = probes
@@ -582,19 +597,27 @@ fn connect(
         )
     };
 
-    let session = match target {
-        Some(name) => {
+    let attach_err = |e: probe_rs::Error, name: &str| {
+        lang.pick(
+            format!("连接目标 {name} 失败: {e}"),
+            format!("Failed to connect to target {name}: {e}"),
+        )
+    };
+
+    let session = match (target, boot_mode) {
+        (Some(name), BootMode::Normal) => {
             let probe = info.open().map_err(open_err)?;
             probe
                 .attach(TargetSelector::Unspecified(name.clone()), permissions)
-                .map_err(|e| {
-                    lang.pick(
-                        format!("连接目标 {} 失败: {e}", name),
-                        format!("Failed to connect to target {}: {e}", name),
-                    )
-                })?
+                .map_err(|e| attach_err(e, &name))?
         }
-        None => {
+        (Some(name), BootMode::UnderReset) => {
+            let probe = info.open().map_err(open_err)?;
+            probe
+                .attach_under_reset(TargetSelector::Unspecified(name.clone()), permissions)
+                .map_err(|e| attach_err(e, &name))?
+        }
+        (None, BootMode::Normal) => {
             let probe = info.open().map_err(open_err)?;
             match probe.attach(TargetSelector::Auto, permissions.clone()) {
                 Ok(s) => s,
@@ -609,6 +632,28 @@ fn connect(
                                 ),
                                 format!(
                                     "Auto-detection failed: {first}. The probe may not support auto-identification (e.g. DAPLink/CMSIS-DAP). Please search and select the chip model under 'Manual Target Selection' on the left and retry"
+                                ),
+                            ))
+                        }
+                    }
+                }
+            }
+        }
+        (None, BootMode::UnderReset) => {
+            let probe = info.open().map_err(open_err)?;
+            match probe.attach_under_reset(TargetSelector::Auto, permissions.clone()) {
+                Ok(s) => s,
+                Err(first) => {
+                    let probe2 = info.open().map_err(open_err)?;
+                    match probe2.attach(TargetSelector::Auto, permissions) {
+                        Ok(s) => s,
+                        Err(_) => {
+                            return Err(lang.pick(
+                                format!(
+                                    "复位期间连接目标失败: {first}。该探针可能不支持自动识别芯片（如 DAPLink/CMSIS-DAP），请在左侧『手动指定目标芯片』中搜索并选择芯片型号后重试"
+                                ),
+                                format!(
+                                    "Failed to attach under reset: {first}. The probe may not support auto-identification (e.g. DAPLink/CMSIS-DAP). Please search and select the chip model under 'Manual Target Selection' on the left and retry"
                                 ),
                             ))
                         }

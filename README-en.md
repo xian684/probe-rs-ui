@@ -14,12 +14,13 @@ It automatically detects debug probes, identifies target chips, supports manual 
 
 - 🔍 **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).
 - 🎯 **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
-- 🧩 **Manual chip selection**: Full built-in probe-rs chip database with real-time keyword search, grouped by chip family and variant (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
+- 🔌 **Connection mode**: Choose **Normal** or **Under Reset** connection, matching STM32 BOOT0/BOOT1 boot configurations — useful when target code interferes with SWD or when booting from system memory.
+- 🧩 **Manual chip selection**: Full built-in probe-rs chip database with three-level cascade selection by brand, family and variant, plus real-time keyword search (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
 - 📁 **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
-- ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`.
+- ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`, including extensionless Rust ELF build artifacts.
 - ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
 - 🗑️ **Chip erase / target reset**: One-click operations.
-- 📊 **Progress display**: Real-time progress bars for erase, program, and verify.
+- 📊 **Progress display**: Real-time progress bars for erase, program, and verify; operations with an unknown total size (e.g. chip erase) show a spinner.
 - 🌐 **Bilingual UI**: Built-in CJK font loading (Microsoft YaHei / SimSun / PingFang / WenQuanYi); switch between 中文 and English from the top bar.
 - 🖼️ **Icons**: Buttons have icons and the window uses a chip-style icon.
 
@@ -40,7 +41,7 @@ The executable is produced at `target/release/probe-rs-ui` (`probe-rs-ui.exe` on
 ## Usage
 
 1. Connect the debug probe and target chip. The app scans probes on startup.
-2. Click **Auto-detect Target**; if your probe does not support auto-detection (e.g. DAPLink), search and select the chip family and variant under **Manual Target Selection**, then click **Connect by Model**.
+2. Click **Auto-detect Target**; if your probe does not support auto-detection (e.g. DAPLink), pick the brand, family and variant under **Manual Target Selection**, then click **Connect by Model**.
 3. Pick a firmware file, or click **Select Project Folder...** to auto-locate compiled firmware.
 4. Toggle the flashing options as needed, then click **Flash**.
 
