@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use eframe::egui;
 
+use crate::i18n::Lang;
 use crate::worker::{
     self, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo, TargetSummary, WorkerCommand,
     WorkerEvent,
@@ -32,6 +33,8 @@ struct OpBar {
 pub struct ProbeUiApp {
     to_worker: Sender<WorkerCommand>,
     from_worker: Receiver<WorkerEvent>,
+
+    lang: Lang,
 
     probes: Vec<ProbeInfo>,
     selected_probe: usize,
@@ -87,11 +90,12 @@ impl ProbeUiApp {
     }
 
     pub fn new() -> Self {
-        let worker = worker::spawn();
+        let worker = worker::spawn(Lang::Zh);
         let chip_families = worker::builtin_chip_families();
         let mut app = ProbeUiApp {
             to_worker: worker.sender,
             from_worker: worker.receiver,
+            lang: Lang::Zh,
             probes: Vec::new(),
             selected_probe: 0,
             probing: true,
@@ -115,19 +119,42 @@ impl ProbeUiApp {
             log: Vec::new(),
         };
         app.log(
-            format!(
-                "已加载 {} 个内置芯片系列，可手动指定目标",
-                app.chip_families.len()
+            app.lang.pick(
+                format!(
+                    "已加载 {} 个内置芯片系列，可手动指定目标",
+                    app.chip_families.len()
+                ),
+                format!(
+                    "Loaded {} built-in chip families; manual target selection is available",
+                    app.chip_families.len()
+                ),
             ),
             LogLevel::Info,
         );
-        app.log("正在扫描调试探针...", LogLevel::Info);
+        app.log(
+            app.lang.pick(
+                "正在扫描调试探针...",
+                "Scanning debug probes...",
+            ),
+            LogLevel::Info,
+        );
         app.send(WorkerCommand::Scan);
         app
     }
 
     fn send(&self, cmd: WorkerCommand) {
         let _ = self.to_worker.send(cmd);
+    }
+
+    fn t(&self, zh: &'static str, en: &'static str) -> &'static str {
+        self.lang.pick(zh, en)
+    }
+
+    fn set_lang(&mut self, lang: Lang) {
+        if self.lang != lang {
+            self.lang = lang;
+            self.send(WorkerCommand::SetLang(lang));
+        }
     }
 
     fn log(&mut self, text: impl Into<String>, level: LogLevel) {
@@ -162,9 +189,17 @@ impl ProbeUiApp {
                 self.probing = false;
                 self.probes = list;
                 if self.probes.is_empty() {
-                    self.log_warn("未检测到任何调试探针，请检查 USB 连接与驱动");
+                    self.log_warn(self.t(
+                        "未检测到任何调试探针，请检查 USB 连接与驱动",
+                        "No debug probes detected. Check USB connection and drivers",
+                    ));
                 } else {
-                    self.log_ok(format!("检测到 {} 个调试探针", self.probes.len()));
+                    self.log_ok(
+                        self.lang.pick(
+                            format!("检测到 {} 个调试探针", self.probes.len()),
+                            format!("Detected {} debug probe(s)", self.probes.len()),
+                        ),
+                    );
                 }
             }
             WorkerEvent::Probes(Err(e)) => {
@@ -174,7 +209,12 @@ impl ProbeUiApp {
             WorkerEvent::Connected(Ok(summary)) => {
                 self.connecting = false;
                 self.busy = false;
-                self.log_ok(format!("已连接目标: {}", summary.name));
+                self.log_ok(
+                    self.lang.pick(
+                        format!("已连接目标: {}", summary.name),
+                        format!("Connected to target: {}", summary.name),
+                    ),
+                );
                 self.connected = Some(summary);
             }
             WorkerEvent::Connected(Err(e)) => {
@@ -214,7 +254,7 @@ impl ProbeUiApp {
             }
             WorkerEvent::OperationDone(Ok(())) => {
                 self.busy = false;
-                self.log_ok("操作成功完成");
+                self.log_ok(self.t("操作成功完成", "Operation completed successfully"));
             }
             WorkerEvent::OperationDone(Err(e)) => {
                 self.busy = false;
@@ -229,23 +269,43 @@ impl ProbeUiApp {
                 self.firmware_root = root.clone();
                 self.firmware_candidates = candidates;
                 if self.firmware_candidates.is_empty() {
-                    self.log_warn(format!(
-                        "在 {} 中未找到固件文件 (.elf / .hex / .bin / .uf2)",
-                        root
-                    ));
+                    self.log_warn(
+                        self.lang.pick(
+                            format!(
+                                "在 {} 中未找到固件文件 (.elf / .hex / .bin / .uf2)",
+                                root
+                            ),
+                            format!(
+                                "No firmware file (.elf / .hex / .bin / .uf2) found in {}",
+                                root
+                            ),
+                        ),
+                    );
                 } else if let Some(i) = best {
                     let path = self.firmware_candidates[i]
                         .path
                         .display()
                         .to_string();
                     self.file_path = path.clone();
-                    self.log_ok(format!(
-                        "自动识别到固件: {}（共 {} 个候选）",
-                        path,
-                        self.firmware_candidates.len()
-                    ));
+                    self.log_ok(
+                        self.lang.pick(
+                            format!(
+                                "自动识别到固件: {}（共 {} 个候选）",
+                                path,
+                                self.firmware_candidates.len()
+                            ),
+                            format!(
+                                "Auto-detected firmware: {} ({} candidate(s))",
+                                path,
+                                self.firmware_candidates.len()
+                            ),
+                        ),
+                    );
                     if self.firmware_candidates.len() > 1 {
-                        self.log_info("如需使用其它固件，请在下方下拉列表中选择");
+                        self.log_info(self.t(
+                            "如需使用其它固件，请在下方下拉列表中选择",
+                            "To use another firmware, pick one from the dropdown below",
+                        ));
                     }
                 }
             }
@@ -268,12 +328,20 @@ impl ProbeUiApp {
 
     fn start_flash(&mut self) {
         if self.detected_format().is_none() {
-            self.log_err("不支持的文件格式，请选择 .elf / .hex / .bin / .uf2 文件");
+            self.log_err(self.t(
+                "不支持的文件格式，请选择 .elf / .hex / .bin / .uf2 文件",
+                "Unsupported file format. Choose a .elf / .hex / .bin / .uf2 file",
+            ));
             return;
         }
         self.busy = true;
         self.op_bars.clear();
-        self.log_info(format!("开始烧录: {}", self.file_path));
+        self.log_info(
+            self.lang.pick(
+                format!("开始烧录: {}", self.file_path),
+                format!("Flashing: {}", self.file_path),
+            ),
+        );
         self.send(WorkerCommand::Flash {
             path: PathBuf::from(self.file_path.clone()),
             do_chip_erase: self.chip_erase,
@@ -303,21 +371,35 @@ impl eframe::App for ProbeUiApp {
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                ui.heading("Probe-rs 烧录工具");
+                ui.heading(self.t("Probe-rs 烧录工具", "Probe-rs Flasher"));
                 ui.separator();
                 if self.connected.is_some() {
                     ui.colored_label(
                         egui::Color32::from_rgb(0x2e, 0xa0, 0x43),
-                        "● 已连接",
+                        self.t("● 已连接", "● Connected"),
                     );
                 } else {
                     ui.colored_label(
                         egui::Color32::from_rgb(0xcc, 0x88, 0x00),
-                        "○ 未连接",
+                        self.t("○ 未连接", "○ Not connected"),
                     );
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(egui::RichText::new("基于 probe-rs v0.32").weak());
+                    egui::ComboBox::from_id_salt("lang_sel")
+                        .width(90.0)
+                        .selected_text(if self.lang.is_en() { "English" } else { "中文" })
+                        .show_ui(ui, |ui| {
+                            if ui
+                                .selectable_label(!self.lang.is_en(), "中文")
+                                .clicked()
+                            {
+                                self.set_lang(Lang::Zh);
+                            }
+                            if ui.selectable_label(self.lang.is_en(), "English").clicked() {
+                                self.set_lang(Lang::En);
+                            }
+                        });
                 });
             });
             ui.add_space(4.0);
@@ -328,18 +410,18 @@ impl eframe::App for ProbeUiApp {
             .default_width(400.0)
             .show(ctx, |ui| {
                 ui.add_space(6.0);
-                ui.heading("设备检测");
+                ui.heading(self.t("设备检测", "Device Detection"));
                 ui.separator();
 
                 ui.horizontal(|ui| {
-                    ui.label("调试探针:");
+                    ui.label(self.t("调试探针:", "Probe:"));
                     egui::ComboBox::from_id_salt("probe_sel")
                         .width(210.0)
                         .selected_text(
                             self.probes
                                 .get(self.selected_probe)
                                 .map(|p| p.identifier.as_str())
-                                .unwrap_or("未选择"),
+                                .unwrap_or(self.t("未选择", "Not selected")),
                         )
                         .show_ui(ui, |ui| {
                             for p in &self.probes {
@@ -354,18 +436,21 @@ impl eframe::App for ProbeUiApp {
                         });
                     let enabled = !self.probing && !self.connecting && !self.busy;
                     if ui
-                        .add_enabled(enabled, egui::Button::new("重新扫描"))
+                        .add_enabled(
+                            enabled,
+                            egui::Button::new(self.t("重新扫描", "Rescan")),
+                        )
                         .clicked()
                     {
                         self.probing = true;
-                        self.log_info("正在扫描探针...");
+                        self.log_info(self.t("正在扫描探针...", "Scanning probes..."));
                         self.send(WorkerCommand::Scan);
                     }
                 });
                 if self.probing {
                     ui.horizontal(|ui| {
                         ui.add(egui::Spinner::new());
-                        ui.label("扫描中...");
+                        ui.label(self.t("扫描中...", "Scanning..."));
                     });
                 }
 
@@ -378,7 +463,7 @@ impl eframe::App for ProbeUiApp {
                     if ui
                         .add_enabled(
                             has_probe,
-                            egui::Button::new("自动识别目标")
+                            egui::Button::new(self.t("自动识别目标", "Auto-detect Target"))
                                 .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                         )
                         .clicked()
@@ -386,55 +471,70 @@ impl eframe::App for ProbeUiApp {
                         self.connecting = true;
                         self.busy = true;
                         self.op_bars.clear();
-                        self.log_info("正在自动识别目标芯片...");
+                        self.log_info(self.t(
+                            "正在自动识别目标芯片...",
+                            "Auto-detecting target chip...",
+                        ));
                         self.send(WorkerCommand::ConnectAuto {
                             probe: self.selected_probe,
                         });
                     }
                     let connected = self.connected.is_some() && !self.busy;
                     if ui
-                        .add_enabled(connected, egui::Button::new("断开"))
+                        .add_enabled(connected, egui::Button::new(self.t("断开", "Disconnect")))
                         .clicked()
                     {
                         self.connected = None;
-                        self.log_info("已断开连接");
+                        self.log_info(self.t("已断开连接", "Disconnected"));
                         self.send(WorkerCommand::Disconnect);
                     }
                 });
                 if self.connecting {
                     ui.horizontal(|ui| {
                         ui.add(egui::Spinner::new());
-                        ui.label("正在连接目标...");
+                        ui.label(self.t("正在连接目标...", "Connecting to target..."));
                     });
                 }
 
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    ui.heading("手动指定目标芯片");
+                    ui.heading(self.t("手动指定目标芯片", "Manual Target Selection"));
                     if self.show_manual {
                         ui.colored_label(
                             egui::Color32::from_rgb(0xc0, 0x3a, 0x2b),
-                            "（自动识别失败，请手动选择）",
+                            self.t(
+                                "（自动识别失败，请手动选择）",
+                                "(auto-detection failed, select manually)",
+                            ),
                         );
                     }
                 });
                 ui.label(
-                    egui::RichText::new("DAPLink / CMSIS-DAP 等探针需手动选择芯片型号")
-                        .small()
-                        .weak(),
+                    egui::RichText::new(self.t(
+                        "DAPLink / CMSIS-DAP 等探针需手动选择芯片型号",
+                        "DAPLink / CMSIS-DAP probes need manual chip selection",
+                    ))
+                    .small()
+                    .weak(),
                 );
                 ui.horizontal(|ui| {
-                    ui.label("搜索型号:");
+                    ui.label(self.t("搜索型号:", "Search:"));
+                    let hint = self.t("如 stm32f103 / nrf52840", "e.g. stm32f103 / nrf52840");
                     ui.add(
                         egui::TextEdit::singleline(&mut self.chip_search)
                             .desired_width(300.0)
                             .font(egui::TextStyle::Small)
-                            .hint_text("如 stm32f103 / nrf52840"),
+                            .hint_text(hint),
                     );
                 });
 
                 if !self.manual_target.is_empty() {
-                    ui.label(format!("已选型号: {}", self.manual_target));
+                    ui.label(
+                        self.lang.pick(
+                            format!("已选型号: {}", self.manual_target),
+                            format!("Selected: {}", self.manual_target),
+                        ),
+                    );
                 }
 
                 let filter = self.chip_search.trim().to_lowercase();
@@ -457,8 +557,12 @@ impl eframe::App for ProbeUiApp {
                 }
 
                 ui.columns(2, |cols| {
-                    cols[0].label(egui::RichText::new("系列").strong().small());
-                    cols[1].label(egui::RichText::new("具体型号").strong().small());
+                    cols[0].label(egui::RichText::new(self.t("系列", "Family")).strong().small());
+                    cols[1].label(
+                        egui::RichText::new(self.t("具体型号", "Variant"))
+                            .strong()
+                            .small(),
+                    );
 
                     let mut picked_family: Option<usize> = None;
                     egui::ScrollArea::vertical()
@@ -466,7 +570,10 @@ impl eframe::App for ProbeUiApp {
                         .max_height(300.0)
                         .show(&mut cols[0], |ui| {
                             if fam_matches.is_empty() {
-                                ui.label(egui::RichText::new("未找到匹配的系列").weak());
+                                ui.label(
+                                    egui::RichText::new(self.t("未找到匹配的系列", "No matching family"))
+                                        .weak(),
+                                );
                             } else {
                                 for i in &fam_matches {
                                     let fam = &self.chip_families[*i];
@@ -517,13 +624,21 @@ impl eframe::App for ProbeUiApp {
                                     }
                                     if shown == 0 {
                                         ui.label(
-                                            egui::RichText::new("该系列下无匹配型号").weak(),
+                                            egui::RichText::new(self.t(
+                                                "该系列下无匹配型号",
+                                                "No matching variant in this family",
+                                            ))
+                                            .weak(),
                                         );
                                     }
                                 }
                                 None => {
                                     ui.label(
-                                        egui::RichText::new("请先在左侧选择芯片系列").weak(),
+                                        egui::RichText::new(self.t(
+                                            "请先在左侧选择芯片系列",
+                                            "Select a chip family on the left first",
+                                        ))
+                                        .weak(),
                                     );
                                 }
                             }
@@ -540,7 +655,7 @@ impl eframe::App for ProbeUiApp {
                 if ui
                     .add_enabled(
                         enabled,
-                        egui::Button::new("按型号连接")
+                        egui::Button::new(self.t("按型号连接", "Connect by Model"))
                             .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                     )
                     .clicked()
@@ -548,7 +663,12 @@ impl eframe::App for ProbeUiApp {
                     let target = self.manual_target.trim().to_owned();
                     self.connecting = true;
                     self.busy = true;
-                    self.log_info(format!("正在连接 {} ...", target));
+                    self.log_info(
+                        self.lang.pick(
+                            format!("正在连接 {} ...", target),
+                            format!("Connecting to {} ...", target),
+                        ),
+                    );
                     self.send(WorkerCommand::ConnectManual {
                         probe: self.selected_probe,
                         target,
@@ -560,15 +680,35 @@ impl eframe::App for ProbeUiApp {
                 ui.separator();
                 match &self.connected {
                     Some(summary) => {
-                        ui.heading("目标信息");
-                        ui.label(format!("芯片型号: {}", summary.name));
-                        ui.label(format!("架构: {}", summary.architecture));
-                        ui.label(format!("核心数量: {}", summary.cores.len()));
+                        ui.heading(self.t("目标信息", "Target Info"));
+                        ui.label(
+                            self.lang.pick(
+                                format!("芯片型号: {}", summary.name),
+                                format!("Chip: {}", summary.name),
+                            ),
+                        );
+                        ui.label(
+                            self.lang.pick(
+                                format!("架构: {}", summary.architecture),
+                                format!("Architecture: {}", summary.architecture),
+                            ),
+                        );
+                        ui.label(
+                            self.lang.pick(
+                                format!("核心数量: {}", summary.cores.len()),
+                                format!("Cores: {}", summary.cores.len()),
+                            ),
+                        );
                         for (i, c) in &summary.cores {
-                            ui.label(format!("  核心 {}: {}", i, c));
+                            ui.label(
+                                self.lang.pick(
+                                    format!("  核心 {}: {}", i, c),
+                                    format!("  Core {}: {}", i, c),
+                                ),
+                            );
                         }
                         ui.add_space(4.0);
-                        ui.label(egui::RichText::new("内存映射:").strong());
+                        ui.label(egui::RichText::new(self.t("内存映射:", "Memory Map:")).strong());
                         egui::ScrollArea::vertical()
                             .id_salt("mem_scroll")
                             .max_height(220.0)
@@ -585,53 +725,80 @@ impl eframe::App for ProbeUiApp {
                             });
                     }
                     None => {
-                        ui.label(egui::RichText::new("尚未连接目标").weak());
+                        ui.label(egui::RichText::new(self.t("尚未连接目标", "Not connected")).weak());
                     }
                 }
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(6.0);
-            ui.heading("固件烧录");
+            ui.heading(self.t("固件烧录", "Firmware Flashing"));
             ui.separator();
 
             ui.horizontal(|ui| {
-                ui.label("固件文件:");
+                ui.label(self.t("固件文件:", "Firmware file:"));
+                let hint = self.t(
+                    "选择 .elf / .hex / .bin / .uf2 文件",
+                    "Select .elf / .hex / .bin / .uf2 file",
+                );
                 ui.add(
                     egui::TextEdit::singleline(&mut self.file_path)
                         .desired_width(320.0)
-                        .hint_text("选择 .elf / .hex / .bin / .uf2 文件"),
+                        .hint_text(hint),
                 );
-                if ui.button("浏览...").clicked() {
+                if ui.button(self.t("浏览...", "Browse...")).clicked() {
                     if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("固件镜像", &["elf", "hex", "bin", "uf2"])
+                        .add_filter(self.t("固件镜像", "Firmware image"), &["elf", "hex", "bin", "uf2"])
                         .pick_file()
                     {
                         self.file_path = path.display().to_string();
-                        self.log_info(format!("已选择固件: {}", self.file_path));
+                        self.log_info(
+                            self.lang.pick(
+                                format!("已选择固件: {}", self.file_path),
+                                format!("Selected firmware: {}", self.file_path),
+                            ),
+                        );
                     }
                 }
-                if ui.button("选择项目文件夹...").clicked() {
+                if ui.button(self.t("选择项目文件夹...", "Select Project Folder...")).clicked() {
                     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
                         self.firmware_root = dir.display().to_string();
                         self.firmware_scanning = true;
                         self.firmware_candidates.clear();
-                        self.log_info(format!(
-                            "正在扫描项目文件夹并自动识别固件: {}",
-                            self.firmware_root
-                        ));
+                        self.log_info(
+                            self.lang.pick(
+                                format!(
+                                    "正在扫描项目文件夹并自动识别固件: {}",
+                                    self.firmware_root
+                                ),
+                                format!(
+                                    "Scanning project folder and auto-detecting firmware: {}",
+                                    self.firmware_root
+                                ),
+                            ),
+                        );
                         self.send(WorkerCommand::ScanFirmware { root: dir });
                     }
                 }
             });
             if let Some(fmt) = self.detected_format() {
-                ui.label(format!("文件格式: {}", fmt));
+                ui.label(
+                    self.lang.pick(
+                        format!("文件格式: {}", fmt),
+                        format!("File format: {}", fmt),
+                    ),
+                );
             }
 
             if self.firmware_scanning {
                 ui.horizontal(|ui| {
                     ui.add(egui::Spinner::new());
-                    ui.label(format!("扫描中: {}", self.firmware_root));
+                    ui.label(
+                        self.lang.pick(
+                            format!("扫描中: {}", self.firmware_root),
+                            format!("Scanning: {}", self.firmware_root),
+                        ),
+                    );
                 });
             }
             if self.firmware_candidates.len() > 1 {
@@ -655,7 +822,7 @@ impl eframe::App for ProbeUiApp {
                             .map(|f| f.to_string_lossy().into_owned())
                             .unwrap_or_default();
                         if name.is_empty() {
-                            "未选择项目固件".to_owned()
+                            self.t("未选择项目固件", "No project firmware").to_owned()
                         } else {
                             name
                         }
@@ -663,7 +830,7 @@ impl eframe::App for ProbeUiApp {
                 };
                 let mut chosen: Option<usize> = None;
                 ui.horizontal(|ui| {
-                    ui.label("项目固件:");
+                    ui.label(self.t("项目固件:", "Project firmware:"));
                     egui::ComboBox::from_id_salt("fw_sel")
                         .width(400.0)
                         .selected_text(sel_text)
@@ -687,17 +854,26 @@ impl eframe::App for ProbeUiApp {
                 if let Some(i) = chosen {
                     if let Some(c) = self.firmware_candidates.get(i) {
                         self.file_path = c.path.display().to_string();
-                        self.log_info(format!("已选择固件: {}", self.file_path));
+                        self.log_info(
+                            self.lang.pick(
+                                format!("已选择固件: {}", self.file_path),
+                                format!("Selected firmware: {}", self.file_path),
+                            ),
+                        );
                     }
                 }
             }
 
             ui.add_space(8.0);
+            let l_erase = self.t("全片擦除后烧录", "Chip erase before flash");
+            let l_verify = self.t("烧录后校验", "Verify after flash");
+            let l_keep = self.t("保留未写入字节", "Keep unwritten bytes");
+            let l_reset = self.t("烧录后复位运行", "Reset and run after flash");
             ui.horizontal_wrapped(|ui| {
-                ui.checkbox(&mut self.chip_erase, "全片擦除后烧录");
-                ui.checkbox(&mut self.verify, "烧录后校验");
-                ui.checkbox(&mut self.keep_unwritten, "保留未写入字节");
-                ui.checkbox(&mut self.reset_after, "烧录后复位运行");
+                ui.checkbox(&mut self.chip_erase, l_erase);
+                ui.checkbox(&mut self.verify, l_verify);
+                ui.checkbox(&mut self.keep_unwritten, l_keep);
+                ui.checkbox(&mut self.reset_after, l_reset);
             });
 
             ui.add_space(10.0);
@@ -710,7 +886,7 @@ impl eframe::App for ProbeUiApp {
                 if ui
                     .add_enabled(
                         can_flash,
-                        egui::Button::new("开始烧录")
+                        egui::Button::new(self.t("开始烧录", "Flash"))
                             .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43))
                             .min_size(egui::vec2(110.0, 32.0)),
                     )
@@ -723,22 +899,22 @@ impl eframe::App for ProbeUiApp {
                     && !self.connecting
                     && !self.probing;
                 if ui
-                    .add_enabled(can_erase, egui::Button::new("全片擦除"))
+                    .add_enabled(can_erase, egui::Button::new(self.t("全片擦除", "Erase All")))
                     .clicked()
                 {
                     self.busy = true;
                     self.op_bars.clear();
-                    self.log_info("开始全片擦除...");
+                    self.log_info(self.t("开始全片擦除...", "Erasing all flash..."));
                     self.send(WorkerCommand::EraseAll);
                 }
                 if ui
                     .add_enabled(
                         self.connected.is_some() && !self.busy,
-                        egui::Button::new("复位目标"),
+                        egui::Button::new(self.t("复位目标", "Reset Target")),
                     )
                     .clicked()
                 {
-                    self.log_info("正在复位目标...");
+                    self.log_info(self.t("正在复位目标...", "Resetting target..."));
                     self.send(WorkerCommand::Reset);
                 }
             });
@@ -769,7 +945,7 @@ impl eframe::App for ProbeUiApp {
             }
 
             ui.add_space(10.0);
-            ui.label(egui::RichText::new("日志").strong());
+            ui.label(egui::RichText::new(self.t("日志", "Log")).strong());
             egui::ScrollArea::vertical()
                 .id_salt("log_scroll")
                 .auto_shrink([false, false])

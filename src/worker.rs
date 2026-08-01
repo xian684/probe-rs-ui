@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::UNIX_EPOCH;
 
+use crate::i18n::Lang;
+
 use probe_rs::config::{MemoryRegion, TargetSelector};
 use probe_rs::flashing::{
     erase_all, BinLoader, BinOptions, DownloadOptions, ElfLoader, ElfOptions, FlashProgress,
@@ -71,6 +73,7 @@ pub enum WorkerCommand {
     Disconnect,
     Shutdown,
     ScanFirmware { root: PathBuf },
+    SetLang(Lang),
 }
 
 /// 后台工作线程回传给界面的事件。
@@ -125,12 +128,12 @@ pub fn builtin_chip_families() -> Vec<ChipFamilyInfo> {
     families
 }
 
-pub fn spawn() -> Worker {
+pub fn spawn(lang: Lang) -> Worker {
     let (tx, rx) = mpsc::channel::<WorkerCommand>();
     let (etx, erx) = mpsc::channel::<WorkerEvent>();
     std::thread::Builder::new()
         .name("probe-rs-worker".to_owned())
-        .spawn(move || run(rx, etx))
+        .spawn(move || run(rx, etx, lang))
         .expect("无法创建后台工作线程");
     Worker {
         sender: tx,
@@ -138,7 +141,7 @@ pub fn spawn() -> Worker {
     }
 }
 
-fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>) {
+fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut lang: Lang) {
     let mut session: Option<Session> = None;
     let mut probes: Vec<DebugProbeInfo> = Vec::new();
 
@@ -163,7 +166,7 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>) {
                     let _ = events.send(WorkerEvent::Probes(Err(e)));
                 }
             },
-            WorkerCommand::ConnectAuto { probe } => match connect(&probes, probe, None) {
+            WorkerCommand::ConnectAuto { probe } => match connect(&probes, probe, None, lang) {
                 Ok((s, summary)) => {
                     session = Some(s);
                     let _ = events.send(WorkerEvent::Connected(Ok(summary)));
@@ -173,7 +176,7 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>) {
                 }
             },
             WorkerCommand::ConnectManual { probe, target } => {
-                match connect(&probes, probe, Some(target)) {
+                match connect(&probes, probe, Some(target), lang) {
                     Ok((s, summary)) => {
                         session = Some(s);
                         let _ = events.send(WorkerEvent::Connected(Ok(summary)));
@@ -198,13 +201,18 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>) {
                         verify,
                         keep_unwritten_bytes,
                         &events,
+                        lang,
                     ),
-                    None => Err("尚未连接到目标芯片，请先自动识别目标".to_owned()),
+                    None => Err(lang.pick(
+                        "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                        "Not connected to a target. Auto-detect or select the target first"
+                            .to_owned(),
+                    )),
                 };
                 match result {
                     Ok(()) => {
                         if reset_after {
-                            let _ = reset(session.as_mut().expect("session 必须存在"));
+                            let _ = reset(session.as_mut().expect("session 必须存在"), lang);
                         }
                         let _ = events.send(WorkerEvent::OperationDone(Ok(())));
                     }
@@ -215,21 +223,31 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>) {
             }
             WorkerCommand::EraseAll => {
                 let result = match &mut session {
-                    Some(sess) => erase_flash(sess, &events),
-                    None => Err("尚未连接到目标芯片，请先自动识别目标".to_owned()),
+                    Some(sess) => erase_flash(sess, &events, lang),
+                    None => Err(lang.pick(
+                        "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                        "Not connected to a target. Auto-detect or select the target first"
+                            .to_owned(),
+                    )),
                 };
                 let _ = events.send(WorkerEvent::OperationDone(result));
             }
             WorkerCommand::Reset => {
                 let result = match &mut session {
-                    Some(sess) => reset(sess),
-                    None => Err("尚未连接到目标芯片".to_owned()),
+                    Some(sess) => reset(sess, lang),
+                    None => Err(lang.pick(
+                        "尚未连接到目标芯片".to_owned(),
+                        "Not connected to a target".to_owned(),
+                    )),
                 };
                 let _ = events.send(WorkerEvent::OperationDone(result));
             }
             WorkerCommand::Disconnect => {
                 session = None;
-                let _ = events.send(WorkerEvent::Status("已断开连接".to_owned()));
+                let _ = events.send(WorkerEvent::Status(lang.pick(
+                    "已断开连接".to_owned(),
+                    "Disconnected".to_owned(),
+                )));
             }
             WorkerCommand::ScanFirmware { root } => {
                 let (candidates, best) = scan_firmware(&root);
@@ -239,6 +257,7 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>) {
                     best,
                 });
             }
+            WorkerCommand::SetLang(l) => lang = l,
             WorkerCommand::Shutdown => break,
         }
     }
@@ -361,38 +380,55 @@ fn connect(
     probes: &[DebugProbeInfo],
     index: usize,
     target: Option<String>,
+    lang: Lang,
 ) -> Result<(Session, TargetSummary), String> {
     let info = probes
         .get(index)
         .cloned()
-        .ok_or_else(|| format!("未找到编号为 {index} 的调试探针"))?;
+        .ok_or_else(|| {
+            lang.pick(
+                format!("未找到编号为 {index} 的调试探针"),
+                format!("No debug probe with index {index} found"),
+            )
+        })?;
 
     let permissions = Permissions::new().allow_erase_all();
 
+    let open_err = |e| {
+        lang.pick(
+            format!("打开探针失败: {e}"),
+            format!("Failed to open probe: {e}"),
+        )
+    };
+
     let session = match target {
         Some(name) => {
-            let probe = info
-                .open()
-                .map_err(|e| format!("打开探针失败: {e}"))?;
+            let probe = info.open().map_err(open_err)?;
             probe
                 .attach(TargetSelector::Unspecified(name.clone()), permissions)
-                .map_err(|e| format!("连接目标 {} 失败: {e}", name))?
+                .map_err(|e| {
+                    lang.pick(
+                        format!("连接目标 {} 失败: {e}", name),
+                        format!("Failed to connect to target {}: {e}", name),
+                    )
+                })?
         }
         None => {
-            let probe = info
-                .open()
-                .map_err(|e| format!("打开探针失败: {e}"))?;
+            let probe = info.open().map_err(open_err)?;
             match probe.attach(TargetSelector::Auto, permissions.clone()) {
                 Ok(s) => s,
                 Err(first) => {
-                    let probe2 = info
-                        .open()
-                        .map_err(|e| format!("重新打开探针失败: {e}"))?;
+                    let probe2 = info.open().map_err(open_err)?;
                     match probe2.attach_under_reset(TargetSelector::Auto, permissions) {
                         Ok(s) => s,
                         Err(_) => {
-                            return Err(format!(
-                                "自动识别目标失败: {first}。该探针可能不支持自动识别芯片（如 DAPLink/CMSIS-DAP），请在左侧『手动指定目标芯片』中搜索并选择芯片型号后重试"
+                            return Err(lang.pick(
+                                format!(
+                                    "自动识别目标失败: {first}。该探针可能不支持自动识别芯片（如 DAPLink/CMSIS-DAP），请在左侧『手动指定目标芯片』中搜索并选择芯片型号后重试"
+                                ),
+                                format!(
+                                    "Auto-detection failed: {first}. The probe may not support auto-identification (e.g. DAPLink/CMSIS-DAP). Please search and select the chip model under 'Manual Target Selection' on the left and retry"
+                                ),
                             ))
                         }
                     }
@@ -453,6 +489,7 @@ fn flash(
     verify: bool,
     keep_unwritten_bytes: bool,
     events: &mpsc::Sender<WorkerEvent>,
+    lang: Lang,
 ) -> Result<(), String> {
     let ext = path
         .extension()
@@ -462,7 +499,7 @@ fn flash(
 
     let events2 = events.clone();
     let progress = FlashProgress::new(move |event: ProgressEvent| {
-        if let Some(ev) = map_progress(event) {
+        if let Some(ev) = map_progress(event, lang) {
             let _ = events2.send(ev);
         }
     });
@@ -497,64 +534,88 @@ fn flash(
             probe_rs::flashing::download_file_with_options(session, path, Uf2Loader, options)
         }
         _ => {
-            return Err(format!(
-                "不支持的文件格式: .{ext}，请选择 .elf / .hex / .bin / .uf2 文件"
+            return Err(lang.pick(
+                format!(
+                    "不支持的文件格式: .{ext}，请选择 .elf / .hex / .bin / .uf2 文件"
+                ),
+                format!(
+                    "Unsupported file format: .{ext}. Choose a .elf / .hex / .bin / .uf2 file"
+                ),
             ))
         }
     };
 
-    result.map_err(|e| format!("烧录失败: {e}"))
+    result.map_err(|e| {
+        lang.pick(
+            format!("烧录失败: {e}"),
+            format!("Flashing failed: {e}"),
+        )
+    })
 }
 
 fn erase_flash(
     session: &mut Session,
     events: &mpsc::Sender<WorkerEvent>,
+    lang: Lang,
 ) -> Result<(), String> {
     let events2 = events.clone();
     let mut progress = FlashProgress::new(move |event: ProgressEvent| {
-        if let Some(ev) = map_progress(event) {
+        if let Some(ev) = map_progress(event, lang) {
             let _ = events2.send(ev);
         }
     });
-    erase_all(session, &mut progress, false).map_err(|e| format!("全片擦除失败: {e}"))
+    erase_all(session, &mut progress, false).map_err(|e| {
+        lang.pick(
+            format!("全片擦除失败: {e}"),
+            format!("Chip erase failed: {e}"),
+        )
+    })
 }
 
-fn reset(session: &mut Session) -> Result<(), String> {
-    let mut core = session.core(0).map_err(|e| format!("获取核心失败: {e}"))?;
-    core.reset().map_err(|e| format!("复位失败: {e}"))
+fn reset(session: &mut Session, lang: Lang) -> Result<(), String> {
+    let mut core = session
+        .core(0)
+        .map_err(|e| lang.pick(format!("获取核心失败: {e}"), format!("Failed to get core: {e}")))?;
+    core.reset().map_err(|e| {
+        lang.pick(
+            format!("复位失败: {e}"),
+            format!("Reset failed: {e}"),
+        )
+    })
 }
 
-fn map_progress(event: ProgressEvent) -> Option<WorkerEvent> {
+fn map_progress(event: ProgressEvent, lang: Lang) -> Option<WorkerEvent> {
     match event {
-        ProgressEvent::FlashLayoutReady { .. } => {
-            Some(WorkerEvent::Status("已解析固件布局，准备烧录...".to_owned()))
-        }
+        ProgressEvent::FlashLayoutReady { .. } => Some(WorkerEvent::Status(lang.pick(
+            "已解析固件布局，准备烧录...".to_owned(),
+            "Firmware layout parsed, ready to flash...".to_owned(),
+        ))),
         ProgressEvent::AddProgressBar { operation, total } => Some(WorkerEvent::Progress {
-            operation: op_label(operation),
+            operation: op_label(operation, lang),
             done: 0,
             total,
             state: OpState::Active,
         }),
-        ProgressEvent::Started(operation) => Some(WorkerEvent::Status(format!(
-            "开始{}...",
-            op_label(operation)
+        ProgressEvent::Started(operation) => Some(WorkerEvent::Status(lang.pick(
+            format!("开始{}...", op_label(operation, lang)),
+            format!("Starting {}...", op_label(operation, lang)),
         ))),
         ProgressEvent::Progress {
             operation, size, ..
         } => Some(WorkerEvent::Progress {
-            operation: op_label(operation),
+            operation: op_label(operation, lang),
             done: size,
             total: None,
             state: OpState::Active,
         }),
         ProgressEvent::Failed(operation) => Some(WorkerEvent::Progress {
-            operation: op_label(operation),
+            operation: op_label(operation, lang),
             done: 0,
             total: None,
             state: OpState::Failed,
         }),
         ProgressEvent::Finished(operation) => Some(WorkerEvent::Progress {
-            operation: op_label(operation),
+            operation: op_label(operation, lang),
             done: 0,
             total: None,
             state: OpState::Done,
@@ -563,12 +624,12 @@ fn map_progress(event: ProgressEvent) -> Option<WorkerEvent> {
     }
 }
 
-fn op_label(op: ProgressOperation) -> &'static str {
+fn op_label(op: ProgressOperation, lang: Lang) -> &'static str {
     match op {
-        ProgressOperation::Erase => "擦除",
-        ProgressOperation::Program => "编程",
-        ProgressOperation::Verify => "校验",
-        ProgressOperation::Fill => "填充",
+        ProgressOperation::Erase => lang.pick("擦除", "Erase"),
+        ProgressOperation::Program => lang.pick("编程", "Program"),
+        ProgressOperation::Verify => lang.pick("校验", "Verify"),
+        ProgressOperation::Fill => lang.pick("填充", "Fill"),
     }
 }
 

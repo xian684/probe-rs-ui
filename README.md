@@ -1,63 +1,66 @@
-# Probe-rs 烧录工具
+# Probe-rs Flasher
 
-基于 [probe-rs](https://probe.rs/) 与 [egui](https://github.com/emilk/egui) 开发的嵌入式固件图形化烧录工具。
+A graphical embedded firmware flashing tool built on [probe-rs](https://probe.rs/) and [egui](https://github.com/emilk/egui).
 
-支持自动检测调试探针、识别目标芯片、手动指定芯片型号，以及一键烧录、全片擦除、复位等操作，无需记忆命令行参数。
+It automatically detects debug probes, identifies target chips, supports manual chip selection, and provides one-click flashing, chip erase, and reset — no need to memorize command-line flags.
 
-## 功能特性
+> 中文文档见 [README-zh.md](README-zh.md)
 
-- **探针自动扫描**：自动枚举已连接的调试探针（ST-Link、J-Link、DAPLink / CMSIS-DAP 等）。
-- **目标自动识别**：支持自动识别芯片型号（ST-Link / J-Link 等可自报型号的探针）。
-- **手动指定芯片**：内置 probe-rs 全部芯片型号库，可按关键字实时搜索选择（适用于 DAPLink / CMSIS-DAP 等无法自动识别的探针）。
-- **固件自动定位**：选择项目文件夹后自动扫描常见构建产物（cargo `target/`、Keil `Objects/`、CubeIDE `Debug/`、CMake `build/` 等），自动选中最佳固件，多候选可下拉切换。
-- **固件烧录**：支持 `.elf` / `.axf` / `.hex` / `.bin` / `.uf2` 格式。
-- **可配置烧录选项**：全片擦除、烧录后校验、保留未写入字节、烧录后复位运行。
-- **全片擦除 / 目标复位**：一键操作。
-- **进度显示**：擦除、编程、校验等操作进度条实时更新。
-- **中文界面**：内置 CJK 字体加载（微软雅黑 / 宋体 / 苹方 / 文泉驿）。
+## Features
 
-## 系统要求
+- **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).
+- **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
+- **Manual chip selection**: Full built-in probe-rs chip database with real-time keyword search, grouped by chip family and variant (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
+- **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
+- **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`.
+- **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
+- **Chip erase / target reset**: One-click operations.
+- **Progress display**: Real-time progress bars for erase, program, and verify.
+- **Bilingual UI**: Built-in CJK font loading (Microsoft YaHei / SimSun / PingFang / WenQuanYi); switch between 中文 and English from the top bar.
+
+## Requirements
 
 - Windows / Linux / macOS
-- Rust 1.97 或更高版本（构建时）
-- 支持 SWD / JTAG 的调试探针（ST-Link、J-Link、DAPLink、CMSIS-DAP 等）
+- Rust 1.97 or newer (to build)
+- A SWD / JTAG debug probe (ST-Link, J-Link, DAPLink, CMSIS-DAP, etc.)
 
-## 构建
+## Build
 
 ```bash
 cargo build --release
 ```
 
-生成的可执行文件位于 `target/release/probe-rs-ui`（Windows 为 `probe-rs-ui.exe`），可直接双击运行。
+The executable is produced at `target/release/probe-rs-ui` (`probe-rs-ui.exe` on Windows). You can run it directly.
 
-## 使用方法
+## Usage
 
-1. 连接调试探针与目标芯片，启动程序后自动扫描探针。
-2. 点击 **自动识别目标**；若探针不支持自动识别（如 DAPLink），在左侧 **手动指定目标芯片** 中搜索并选择型号后点击 **按型号连接**。
-3. 选择固件文件，或点击 **选择项目文件夹...** 让程序自动定位编译产物。
-4. 按需勾选烧录选项，点击 **开始烧录**。
+1. Connect the debug probe and target chip. The app scans probes on startup.
+2. Click **Auto-detect Target**; if your probe does not support auto-detection (e.g. DAPLink), search and select the chip family and variant under **Manual Target Selection**, then click **Connect by Model**.
+3. Pick a firmware file, or click **Select Project Folder...** to auto-locate compiled firmware.
+4. Toggle the flashing options as needed, then click **Flash**.
 
-## 依赖版本
+## Dependencies
 
-| 依赖 | 版本 |
-| ---- | ---- |
+| Dependency | Version |
+| ---------- | ------- |
 | eframe / egui | 0.31 |
 | probe-rs | 0.32 |
 | rfd | 0.17 |
 
-## 项目结构
+## Project Structure
 
 ```
 src/
-├── main.rs    程序入口与窗口配置
-├── app.rs     egui 界面、字体加载、事件处理
-└── worker.rs  后台工作线程：探针扫描、连接、烧录、擦除、复位、固件扫描
+├── main.rs    Entry point and window configuration
+├── app.rs     egui UI, font loading, event handling
+├── worker.rs  Background thread: probe scan, connect, flash, erase, reset, firmware scan
+└── i18n.rs    Language support (中文 / English)
 ```
 
-## 常见问题
+## FAQ
 
-**DAPLink 无法自动识别芯片？**
-DAPLink / CMSIS-DAP 为通用调试协议，不向主机上报芯片型号，因此无法自动识别。请在左侧 **手动指定目标芯片** 中搜索并选择型号后连接。
+**Why can't DAPLink auto-detect the chip?**
+DAPLink / CMSIS-DAP use a generic debug protocol that does not report the chip identity to the host, so auto-detection is impossible. Select the chip family and variant under **Manual Target Selection** and connect by model instead.
 
-**找不到编译产物？**
-点击 **选择项目文件夹...** 后，程序会递归扫描常见构建输出目录；若仍未找到，请确认固件为 `.elf` / `.hex` / `.bin` / `.uf2` 格式。
+**Firmware not found after picking a project folder?**
+Click **Select Project Folder...** to scan common build output directories recursively; if nothing shows up, make sure the firmware is in `.elf` / `.hex` / `.bin` / `.uf2` format.
