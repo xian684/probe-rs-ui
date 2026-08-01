@@ -67,6 +67,7 @@ pub struct ProbeUiApp {
     log: Vec<LogEntry>,
 
     rtt_on: bool,
+    rtt_enabled: bool,
     rtt_buf: String,
     rtt_autoscroll: bool,
     rtt_down_input: String,
@@ -106,6 +107,7 @@ impl ProbeUiApp {
             op_bars: Vec::new(),
             log: Vec::new(),
             rtt_on: false,
+            rtt_enabled: false,
             rtt_buf: String::new(),
             rtt_autoscroll: true,
             rtt_down_input: String::new(),
@@ -404,6 +406,26 @@ impl ProbeUiApp {
                 ui.horizontal(|ui| {
                     ui.heading(self.t("RTT 日志", "RTT Log"));
                     ui.separator();
+                    let was_enabled = self.rtt_enabled;
+                    let enabled_label = self.t("启用 RTT", "Enable RTT");
+                    ui.checkbox(&mut self.rtt_enabled, enabled_label);
+                    if was_enabled && !self.rtt_enabled && self.rtt_on {
+                        self.rtt_on = false;
+                        self.send(WorkerCommand::RttStop);
+                        self.log_info(self.t("正在停止 RTT...", "Stopping RTT..."));
+                    }
+                });
+                if !self.rtt_enabled {
+                    ui.label(
+                        egui::RichText::new(self.t(
+                            "RTT 功能已关闭",
+                            "RTT is disabled",
+                        ))
+                        .weak(),
+                    );
+                    return;
+                }
+                ui.horizontal(|ui| {
                     if self.rtt_on {
                         if ui
                             .button(self.icon("⏹", "停止", "Stop"))
