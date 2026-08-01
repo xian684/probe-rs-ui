@@ -319,7 +319,7 @@ impl eframe::App for ProbeUiApp {
 
         egui::SidePanel::left("detect_panel")
             .resizable(true)
-            .default_width(470.0)
+            .default_width(400.0)
             .show(ctx, |ui| {
                 ui.add_space(6.0);
                 ui.heading("设备检测");
@@ -421,7 +421,7 @@ impl eframe::App for ProbeUiApp {
                     ui.label("搜索型号:");
                     ui.add(
                         egui::TextEdit::singleline(&mut self.chip_search)
-                            .desired_width(260.0)
+                            .desired_width(300.0)
                             .hint_text("如 stm32f103 / nrf52840"),
                     );
                 });
