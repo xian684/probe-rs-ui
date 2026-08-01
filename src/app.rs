@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+﻿use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -148,6 +148,11 @@ impl ProbeUiApp {
 
     fn t(&self, zh: &'static str, en: &'static str) -> &'static str {
         self.lang.pick(zh, en)
+    }
+
+    /// 图标 + 本地化文本。
+    fn icon(&self, emoji: &str, zh: &'static str, en: &'static str) -> String {
+        format!("{emoji} {}", self.t(zh, en))
     }
 
     fn set_lang(&mut self, lang: Lang) {
@@ -438,7 +443,11 @@ impl eframe::App for ProbeUiApp {
                     if ui
                         .add_enabled(
                             enabled,
-                            egui::Button::new(self.t("重新扫描", "Rescan")),
+                            egui::Button::new(self.icon(
+                                "🔄",
+                                "重新扫描",
+                                "Rescan",
+                            )),
                         )
                         .clicked()
                     {
@@ -463,8 +472,12 @@ impl eframe::App for ProbeUiApp {
                     if ui
                         .add_enabled(
                             has_probe,
-                            egui::Button::new(self.t("自动识别目标", "Auto-detect Target"))
-                                .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
+                            egui::Button::new(self.icon(
+                                "🔍",
+                                "自动识别目标",
+                                "Auto-detect Target",
+                            ))
+                            .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                         )
                         .clicked()
                     {
@@ -481,7 +494,14 @@ impl eframe::App for ProbeUiApp {
                     }
                     let connected = self.connected.is_some() && !self.busy;
                     if ui
-                        .add_enabled(connected, egui::Button::new(self.t("断开", "Disconnect")))
+                        .add_enabled(
+                            connected,
+                            egui::Button::new(self.icon(
+                                "🔌",
+                                "断开",
+                                "Disconnect",
+                            )),
+                        )
                         .clicked()
                     {
                         self.connected = None;
@@ -655,8 +675,12 @@ impl eframe::App for ProbeUiApp {
                 if ui
                     .add_enabled(
                         enabled,
-                        egui::Button::new(self.t("按型号连接", "Connect by Model"))
-                            .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
+                        egui::Button::new(self.icon(
+                            "🔗",
+                            "按型号连接",
+                            "Connect by Model",
+                        ))
+                        .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                     )
                     .clicked()
                 {
@@ -746,7 +770,13 @@ impl eframe::App for ProbeUiApp {
                         .desired_width(320.0)
                         .hint_text(hint),
                 );
-                if ui.button(self.t("浏览...", "Browse...")).clicked() {
+                if ui
+                    .button(self.icon(
+                        "📂",
+                        "浏览...",
+                        "Browse...",
+                    ))
+                    .clicked() {
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter(self.t("固件镜像", "Firmware image"), &["elf", "hex", "bin", "uf2"])
                         .pick_file()
@@ -760,7 +790,13 @@ impl eframe::App for ProbeUiApp {
                         );
                     }
                 }
-                if ui.button(self.t("选择项目文件夹...", "Select Project Folder...")).clicked() {
+                if ui
+                    .button(self.icon(
+                        "📁",
+                        "选择项目文件夹...",
+                        "Select Project Folder...",
+                    ))
+                    .clicked() {
                     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
                         self.firmware_root = dir.display().to_string();
                         self.firmware_scanning = true;
@@ -886,9 +922,13 @@ impl eframe::App for ProbeUiApp {
                 if ui
                     .add_enabled(
                         can_flash,
-                        egui::Button::new(self.t("开始烧录", "Flash"))
-                            .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43))
-                            .min_size(egui::vec2(110.0, 32.0)),
+                        egui::Button::new(self.icon(
+                            "⚡",
+                            "开始烧录",
+                            "Flash",
+                        ))
+                        .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43))
+                        .min_size(egui::vec2(130.0, 32.0)),
                     )
                     .clicked()
                 {
@@ -899,7 +939,14 @@ impl eframe::App for ProbeUiApp {
                     && !self.connecting
                     && !self.probing;
                 if ui
-                    .add_enabled(can_erase, egui::Button::new(self.t("全片擦除", "Erase All")))
+                    .add_enabled(
+                        can_erase,
+                        egui::Button::new(self.icon(
+                            "🗑",
+                            "全片擦除",
+                            "Erase All",
+                        )),
+                    )
                     .clicked()
                 {
                     self.busy = true;
@@ -910,7 +957,11 @@ impl eframe::App for ProbeUiApp {
                 if ui
                     .add_enabled(
                         self.connected.is_some() && !self.busy,
-                        egui::Button::new(self.t("复位目标", "Reset Target")),
+                        egui::Button::new(self.icon(
+                            "🔁",
+                            "复位目标",
+                            "Reset Target",
+                        )),
                     )
                     .clicked()
                 {
