@@ -98,18 +98,31 @@ pub struct Worker {
     pub receiver: mpsc::Receiver<WorkerEvent>,
 }
 
-/// 枚举 probe-rs 内置的所有芯片型号（按名称排序去重），用于手动选择目标。
-pub fn builtin_chip_names() -> Vec<String> {
+/// 芯片系列及其下的具体型号（用于双列选择器）。
+#[derive(Clone)]
+pub struct ChipFamilyInfo {
+    pub name: String,
+    pub chips: Vec<String>,
+}
+
+/// 枚举 probe-rs 内置芯片，按系列分组（按名称排序）。
+pub fn builtin_chip_families() -> Vec<ChipFamilyInfo> {
     let registry = probe_rs::config::Registry::from_builtin_families();
-    let mut names: Vec<String> = Vec::new();
-    for family in registry.families() {
-        for chip in &family.variants {
-            names.push(chip.name.clone());
-        }
-    }
-    names.sort();
-    names.dedup();
-    names
+    let mut families: Vec<ChipFamilyInfo> = registry
+        .families()
+        .iter()
+        .map(|f| {
+            let mut chips: Vec<String> = f.variants.iter().map(|c| c.name.clone()).collect();
+            chips.sort();
+            chips.dedup();
+            ChipFamilyInfo {
+                name: f.name.trim_end_matches(" Series").to_owned(),
+                chips,
+            }
+        })
+        .collect();
+    families.sort_by(|a, b| a.name.cmp(&b.name));
+    families
 }
 
 pub fn spawn() -> Worker {
@@ -562,7 +575,6 @@ fn op_label(op: ProgressOperation) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn write(path: &Path, bytes: &[u8]) {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, bytes).unwrap();

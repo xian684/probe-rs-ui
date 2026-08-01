@@ -5,7 +5,8 @@ use std::time::Duration;
 use eframe::egui;
 
 use crate::worker::{
-    self, FirmwareCandidate, OpState, ProbeInfo, TargetSummary, WorkerCommand, WorkerEvent,
+    self, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo, TargetSummary, WorkerCommand,
+    WorkerEvent,
 };
 
 #[derive(Clone, Copy)]
@@ -39,7 +40,8 @@ pub struct ProbeUiApp {
 
     connected: Option<TargetSummary>,
     manual_target: String,
-    chips: Vec<String>,
+    chip_families: Vec<ChipFamilyInfo>,
+    selected_family: Option<usize>,
     chip_search: String,
     show_manual: bool,
 
@@ -86,7 +88,7 @@ impl ProbeUiApp {
 
     pub fn new() -> Self {
         let worker = worker::spawn();
-        let chips = worker::builtin_chip_names();
+        let chip_families = worker::builtin_chip_families();
         let mut app = ProbeUiApp {
             to_worker: worker.sender,
             from_worker: worker.receiver,
@@ -96,7 +98,8 @@ impl ProbeUiApp {
             connecting: false,
             connected: None,
             manual_target: String::new(),
-            chips,
+            chip_families,
+            selected_family: None,
             chip_search: String::new(),
             show_manual: false,
             file_path: String::new(),
@@ -112,7 +115,10 @@ impl ProbeUiApp {
             log: Vec::new(),
         };
         app.log(
-            format!("已加载 {} 个内置芯片型号，可手动指定目标", app.chips.len()),
+            format!(
+                "已加载 {} 个内置芯片系列，可手动指定目标",
+                app.chip_families.len()
+            ),
             LogLevel::Info,
         );
         app.log("正在扫描调试探针...", LogLevel::Info);
@@ -318,7 +324,7 @@ impl eframe::App for ProbeUiApp {
         });
 
         egui::SidePanel::left("detect_panel")
-            .resizable(true)
+            .resizable(false)
             .default_width(400.0)
             .show(ctx, |ui| {
                 ui.add_space(6.0);
@@ -422,40 +428,110 @@ impl eframe::App for ProbeUiApp {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.chip_search)
                             .desired_width(300.0)
+                            .font(egui::TextStyle::Small)
                             .hint_text("如 stm32f103 / nrf52840"),
                     );
                 });
-
-                let filter = self.chip_search.trim().to_lowercase();
-                let matches: Vec<usize> = self
-                    .chips
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, c)| filter.is_empty() || c.to_lowercase().contains(&filter))
-                    .take(50)
-                    .map(|(i, _)| i)
-                    .collect();
 
                 if !self.manual_target.is_empty() {
                     ui.label(format!("已选型号: {}", self.manual_target));
                 }
 
-                egui::ScrollArea::vertical()
-                    .id_salt("chip_list")
-                    .max_height(320.0)
-                    .show(ui, |ui| {
-                        if matches.is_empty() {
-                            ui.label(egui::RichText::new("未找到匹配的芯片型号").weak());
-                        } else {
-                            for i in matches {
-                                let name = &self.chips[i];
-                                let selected = self.manual_target == *name;
-                                if ui.selectable_label(selected, name).clicked() {
-                                    self.manual_target = name.clone();
+                let filter = self.chip_search.trim().to_lowercase();
+                let fam_matches: Vec<usize> = self
+                    .chip_families
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, f)| {
+                        filter.is_empty()
+                            || f.name.to_lowercase().contains(&filter)
+                            || f.chips.iter().any(|c| c.to_lowercase().contains(&filter))
+                    })
+                    .map(|(i, _)| i)
+                    .collect();
+
+                if let Some(sf) = self.selected_family {
+                    if !fam_matches.contains(&sf) {
+                        self.selected_family = fam_matches.first().copied();
+                    }
+                }
+
+                ui.columns(2, |cols| {
+                    cols[0].label(egui::RichText::new("系列").strong().small());
+                    cols[1].label(egui::RichText::new("具体型号").strong().small());
+
+                    let mut picked_family: Option<usize> = None;
+                    egui::ScrollArea::vertical()
+                        .id_salt("fam_list")
+                        .max_height(300.0)
+                        .show(&mut cols[0], |ui| {
+                            if fam_matches.is_empty() {
+                                ui.label(egui::RichText::new("未找到匹配的系列").weak());
+                            } else {
+                                for i in &fam_matches {
+                                    let fam = &self.chip_families[*i];
+                                    let selected = Some(*i) == self.selected_family;
+                                    if ui
+                                        .selectable_label(
+                                            selected,
+                                            format!("{} ({})", fam.name, fam.chips.len()),
+                                        )
+                                        .clicked()
+                                    {
+                                        picked_family = Some(*i);
+                                    }
+                                }
+                            }
+                        });
+                    if let Some(i) = picked_family {
+                        self.selected_family = Some(i);
+                        if self.manual_target.is_empty() {
+                            if let Some(fam) = self.chip_families.get(i) {
+                                if let Some(first) = fam.chips.first() {
+                                    self.manual_target = first.clone();
                                 }
                             }
                         }
-                    });
+                    }
+
+                    let fam_index = self.selected_family;
+                    let mut picked_chip: Option<String> = None;
+                    egui::ScrollArea::vertical()
+                        .id_salt("chip_list")
+                        .max_height(300.0)
+                        .show(&mut cols[1], |ui| {
+                            match fam_index.and_then(|i| self.chip_families.get(i)) {
+                                Some(fam) => {
+                                    let mut shown = 0;
+                                    for name in &fam.chips {
+                                        if !filter.is_empty()
+                                            && !name.to_lowercase().contains(&filter)
+                                        {
+                                            continue;
+                                        }
+                                        let selected = self.manual_target == *name;
+                                        if ui.selectable_label(selected, name).clicked() {
+                                            picked_chip = Some(name.clone());
+                                        }
+                                        shown += 1;
+                                    }
+                                    if shown == 0 {
+                                        ui.label(
+                                            egui::RichText::new("该系列下无匹配型号").weak(),
+                                        );
+                                    }
+                                }
+                                None => {
+                                    ui.label(
+                                        egui::RichText::new("请先在左侧选择芯片系列").weak(),
+                                    );
+                                }
+                            }
+                        });
+                    if let Some(name) = picked_chip {
+                        self.manual_target = name;
+                    }
+                });
 
                 let enabled = !self.probes.is_empty()
                     && !self.connecting
