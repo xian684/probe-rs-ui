@@ -6,8 +6,8 @@ use eframe::egui;
 
 use crate::i18n::Lang;
 use crate::worker::{
-    self, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo, TargetSummary, WorkerCommand,
-    WorkerEvent,
+    self, ChipBrandInfo, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo, TargetSummary,
+    WorkerCommand, WorkerEvent,
 };
 
 #[derive(Clone, Copy)]
@@ -44,6 +44,8 @@ pub struct ProbeUiApp {
     connected: Option<TargetSummary>,
     manual_target: String,
     chip_families: Vec<ChipFamilyInfo>,
+    chip_brands: Vec<ChipBrandInfo>,
+    selected_brand: Option<usize>,
     selected_family: Option<usize>,
     chip_search: String,
     show_manual: bool,
@@ -92,6 +94,7 @@ impl ProbeUiApp {
     pub fn new() -> Self {
         let worker = worker::spawn(Lang::Zh);
         let chip_families = worker::builtin_chip_families();
+        let chip_brands = worker::group_brands(&chip_families);
         let mut app = ProbeUiApp {
             to_worker: worker.sender,
             from_worker: worker.receiver,
@@ -103,6 +106,8 @@ impl ProbeUiApp {
             connected: None,
             manual_target: String::new(),
             chip_families,
+            chip_brands,
+            selected_brand: None,
             selected_family: None,
             chip_search: String::new(),
             show_manual: false,
@@ -121,12 +126,14 @@ impl ProbeUiApp {
         app.log(
             app.lang.pick(
                 format!(
-                    "已加载 {} 个内置芯片系列，可手动指定目标",
-                    app.chip_families.len()
+                    "已加载 {} 个内置芯片系列（{} 个品牌），可手动指定目标",
+                    app.chip_families.len(),
+                    app.chip_brands.len()
                 ),
                 format!(
-                    "Loaded {} built-in chip families; manual target selection is available",
-                    app.chip_families.len()
+                    "Loaded {} built-in chip families ({} brands); manual target selection is available",
+                    app.chip_families.len(),
+                    app.chip_brands.len()
                 ),
             ),
             LogLevel::Info,
@@ -153,6 +160,16 @@ impl ProbeUiApp {
     /// 图标 + 本地化文本。
     fn icon(&self, emoji: &str, zh: &'static str, en: &'static str) -> String {
         format!("{emoji} {}", self.t(zh, en))
+    }
+
+    /// 品牌名本地化（其余品牌名为专有名词，直接显示）。
+    fn brand_label(&self, brand: &str) -> String {
+        match brand {
+            "Other" => self.t("其他", "Other").to_owned(),
+            "ARM" => self.t("ARM 通用", "ARM Generic").to_owned(),
+            "RISC-V" => self.t("RISC-V 通用", "RISC-V Generic").to_owned(),
+            _ => brand.to_owned(),
+        }
     }
 
     fn set_lang(&mut self, lang: Lang) {
@@ -412,7 +429,7 @@ impl eframe::App for ProbeUiApp {
 
         egui::SidePanel::left("detect_panel")
             .resizable(false)
-            .default_width(400.0)
+            .default_width(520.0)
             .show(ctx, |ui| {
                 ui.add_space(6.0);
                 ui.heading(self.t("设备检测", "Device Detection"));
@@ -558,46 +575,123 @@ impl eframe::App for ProbeUiApp {
                 }
 
                 let filter = self.chip_search.trim().to_lowercase();
-                let fam_matches: Vec<usize> = self
-                    .chip_families
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, f)| {
-                        filter.is_empty()
-                            || f.name.to_lowercase().contains(&filter)
-                            || f.chips.iter().any(|c| c.to_lowercase().contains(&filter))
-                    })
-                    .map(|(i, _)| i)
-                    .collect();
-
-                if let Some(sf) = self.selected_family {
-                    if !fam_matches.contains(&sf) {
-                        self.selected_family = fam_matches.first().copied();
+                let mut brand_fams: Vec<(usize, Vec<usize>)> = Vec::new();
+                for (bi, brand) in self.chip_brands.iter().enumerate() {
+                    let keep: Vec<usize> = brand
+                        .families
+                        .iter()
+                        .copied()
+                        .filter(|&i| {
+                            let f = &self.chip_families[i];
+                            filter.is_empty()
+                                || f.name.to_lowercase().contains(&filter)
+                                || f.chips.iter().any(|c| c.to_lowercase().contains(&filter))
+                        })
+                        .collect();
+                    if !keep.is_empty() {
+                        brand_fams.push((bi, keep));
                     }
                 }
 
-                ui.columns(2, |cols| {
-                    cols[0].label(egui::RichText::new(self.t("系列", "Family")).strong().small());
+                let brand_pos = self
+                    .selected_brand
+                    .and_then(|b| brand_fams.iter().position(|(bi, _)| *bi == b))
+                    .unwrap_or(0);
+                let sel_brand = brand_fams.get(brand_pos).map(|(bi, _)| *bi);
+                let fam_matches: Vec<usize> = brand_fams
+                    .get(brand_pos)
+                    .map(|(_, fams)| fams.clone())
+                    .unwrap_or_default();
+
+                let mut sel_family = self
+                    .selected_family
+                    .filter(|i| fam_matches.contains(i))
+                    .or_else(|| fam_matches.first().copied());
+                if !filter.is_empty() {
+                    let good = sel_family
+                        .and_then(|i| self.chip_families.get(i))
+                        .map(|f| f.chips.iter().any(|c| c.to_lowercase().contains(&filter)))
+                        .unwrap_or(false);
+                    if !good {
+                        sel_family = fam_matches
+                            .iter()
+                            .copied()
+                            .find(|&i| {
+                                self.chip_families[i]
+                                    .chips
+                                    .iter()
+                                    .any(|c| c.to_lowercase().contains(&filter))
+                            })
+                            .or_else(|| fam_matches.first().copied());
+                    }
+                }
+
+                self.selected_brand = sel_brand;
+                self.selected_family = sel_family;
+
+                ui.columns(3, |cols| {
+                    cols[0].label(
+                        egui::RichText::new(self.t("品牌", "Brand"))
+                            .strong()
+                            .small(),
+                    );
                     cols[1].label(
+                        egui::RichText::new(self.t("系列", "Family"))
+                            .strong()
+                            .small(),
+                    );
+                    cols[2].label(
                         egui::RichText::new(self.t("具体型号", "Variant"))
                             .strong()
                             .small(),
                     );
 
+                    let mut picked_brand: Option<(usize, Option<usize>)> = None;
+                    egui::ScrollArea::vertical()
+                        .id_salt("brand_list")
+                        .max_height(300.0)
+                        .show(&mut cols[0], |ui| {
+                            if brand_fams.is_empty() {
+                                ui.label(
+                                    egui::RichText::new(self.t(
+                                        "未找到匹配的品牌",
+                                        "No matching brand",
+                                    ))
+                                    .weak(),
+                                );
+                            } else {
+                                for (_, (bi, fams)) in brand_fams.iter().enumerate() {
+                                    let brand = &self.chip_brands[*bi];
+                                    let selected = Some(*bi) == sel_brand;
+                                    let label = format!(
+                                        "{} ({})",
+                                        self.brand_label(&brand.name),
+                                        fams.len()
+                                    );
+                                    if ui.selectable_label(selected, label).clicked() {
+                                        picked_brand = Some((*bi, fams.first().copied()));
+                                    }
+                                }
+                            }
+                        });
+
                     let mut picked_family: Option<usize> = None;
                     egui::ScrollArea::vertical()
                         .id_salt("fam_list")
                         .max_height(300.0)
-                        .show(&mut cols[0], |ui| {
+                        .show(&mut cols[1], |ui| {
                             if fam_matches.is_empty() {
                                 ui.label(
-                                    egui::RichText::new(self.t("未找到匹配的系列", "No matching family"))
-                                        .weak(),
+                                    egui::RichText::new(self.t(
+                                        "无匹配系列",
+                                        "No matching family",
+                                    ))
+                                    .weak(),
                                 );
                             } else {
-                                for i in &fam_matches {
-                                    let fam = &self.chip_families[*i];
-                                    let selected = Some(*i) == self.selected_family;
+                                for &i in &fam_matches {
+                                    let fam = &self.chip_families[i];
+                                    let selected = Some(i) == sel_family;
                                     if ui
                                         .selectable_label(
                                             selected,
@@ -605,28 +699,18 @@ impl eframe::App for ProbeUiApp {
                                         )
                                         .clicked()
                                     {
-                                        picked_family = Some(*i);
+                                        picked_family = Some(i);
                                     }
                                 }
                             }
                         });
-                    if let Some(i) = picked_family {
-                        self.selected_family = Some(i);
-                        if self.manual_target.is_empty() {
-                            if let Some(fam) = self.chip_families.get(i) {
-                                if let Some(first) = fam.chips.first() {
-                                    self.manual_target = first.clone();
-                                }
-                            }
-                        }
-                    }
 
-                    let fam_index = self.selected_family;
+                    let fam_index = sel_family;
                     let mut picked_chip: Option<String> = None;
                     egui::ScrollArea::vertical()
                         .id_salt("chip_list")
                         .max_height(300.0)
-                        .show(&mut cols[1], |ui| {
+                        .show(&mut cols[2], |ui| {
                             match fam_index.and_then(|i| self.chip_families.get(i)) {
                                 Some(fam) => {
                                     let mut shown = 0;
@@ -663,6 +747,30 @@ impl eframe::App for ProbeUiApp {
                                 }
                             }
                         });
+
+                    if let Some((bi, first_fam)) = picked_brand {
+                        self.selected_brand = Some(bi);
+                        self.selected_family = first_fam;
+                        if self.manual_target.is_empty() {
+                            if let Some(fam) =
+                                first_fam.and_then(|i| self.chip_families.get(i))
+                            {
+                                if let Some(first) = fam.chips.first() {
+                                    self.manual_target = first.clone();
+                                }
+                            }
+                        }
+                    }
+                    if let Some(i) = picked_family {
+                        self.selected_family = Some(i);
+                        if self.manual_target.is_empty() {
+                            if let Some(fam) = self.chip_families.get(i) {
+                                if let Some(first) = fam.chips.first() {
+                                    self.manual_target = first.clone();
+                                }
+                            }
+                        }
+                    }
                     if let Some(name) = picked_chip {
                         self.manual_target = name;
                     }
