@@ -6,6 +6,10 @@ It automatically detects debug probes, identifies target chips, supports manual 
 
 > 中文文档见 [README.md](README.md)
 
+## Screenshot
+
+![Screenshot](docs/screenshot.png)
+
 ## Features
 
 - 🔍 **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).

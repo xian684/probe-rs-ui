@@ -6,6 +6,10 @@
 
 > English docs: [README-en.md](README-en.md)
 
+## 界面截图
+
+![界面截图](docs/screenshot.png)
+
 ## 功能特性
 
 - 🔍 **探针自动扫描**：自动枚举已连接的调试探针（ST-Link、J-Link、DAPLink / CMSIS-DAP 等）。
