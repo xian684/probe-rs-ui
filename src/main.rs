@@ -5,6 +5,7 @@ mod chips;
 mod firmware;
 mod fonts;
 mod i18n;
+mod rtt;
 mod worker;
 
 /// 程序生成的 64x64 窗口图标（芯片样式）。

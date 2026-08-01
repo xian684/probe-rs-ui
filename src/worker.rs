@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::sync::mpsc::RecvTimeoutError;
+use std::time::Duration;
 
 use crate::firmware::{is_elf, scan_firmware, FirmwareCandidate};
 use crate::i18n::Lang;
@@ -12,6 +14,8 @@ use probe_rs::flashing::{
 };
 use probe_rs::probe::{list::Lister, DebugProbeInfo};
 use probe_rs::{Permissions, Session};
+
+use crate::rtt;
 
 /// 一个可展示给界面的探针描述。
 #[derive(Clone)]
@@ -75,7 +79,13 @@ pub enum WorkerCommand {
     Shutdown,
     ScanFirmware { root: PathBuf },
     SetLang(Lang),
+    RttStart,
+    RttStop,
+    RttWrite { data: Vec<u8> },
 }
+
+/// RTT 轮询间隔。
+const RTT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// 后台工作线程回传给界面的事件。
 pub enum WorkerEvent {
@@ -95,6 +105,9 @@ pub enum WorkerEvent {
         candidates: Vec<FirmwareCandidate>,
         best: Option<usize>,
     },
+    RttData { channel: usize, data: Vec<u8> },
+    RttStarted { up_channels: usize, down_channels: usize },
+    RttStopped,
 }
 
 pub struct Worker {
@@ -118,30 +131,56 @@ pub fn spawn(lang: Lang) -> Worker {
 fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut lang: Lang) {
     let mut session: Option<Session> = None;
     let mut probes: Vec<DebugProbeInfo> = Vec::new();
+    let mut rtt: Option<rtt::Handle> = None;
 
-    while let Ok(cmd) = rx.recv() {
-        match cmd {
-            WorkerCommand::Scan => match scan() {
-                Ok(list) => {
-                    probes = list.clone();
-                    let display = list
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, p)| ProbeInfo {
-                            identifier: p.identifier.clone(),
-                            serial_number: p.serial_number.clone(),
-                            probe_type: format!("{:?}", p.probe_type()),
-                            index: i,
-                        })
-                        .collect();
-                    let _ = events.send(WorkerEvent::Probes(Ok(display)));
+    loop {
+        match rx.recv_timeout(RTT_POLL_INTERVAL) {
+            Err(RecvTimeoutError::Timeout) => {
+                if rtt.is_some() {
+                    rtt::poll(&mut rtt, &mut session, &events, lang);
                 }
-                Err(e) => {
-                    let _ = events.send(WorkerEvent::Probes(Err(e)));
+            }
+            Err(RecvTimeoutError::Disconnected) => break,
+            Ok(cmd) => match cmd {
+                WorkerCommand::Shutdown => break,
+                WorkerCommand::Scan => match scan() {
+                    Ok(list) => {
+                        probes = list.clone();
+                        let display = list
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, p)| ProbeInfo {
+                                identifier: p.identifier.clone(),
+                                serial_number: p.serial_number.clone(),
+                                probe_type: format!("{:?}", p.probe_type()),
+                                index: i,
+                            })
+                            .collect();
+                        let _ = events.send(WorkerEvent::Probes(Ok(display)));
+                    }
+                    Err(e) => {
+                        let _ = events.send(WorkerEvent::Probes(Err(e)));
+                    }
+                },
+                WorkerCommand::ConnectAuto { probe, boot_mode } => {
+                    rtt::stop(&mut rtt, &events, lang, "重新连接前已停止 RTT", "RTT stopped before reconnecting");
+                    match connect(&probes, probe, None, boot_mode, lang) {
+                        Ok((s, summary)) => {
+                            session = Some(s);
+                            let _ = events.send(WorkerEvent::Connected(Ok(summary)));
+                        }
+                        Err(e) => {
+                            let _ = events.send(WorkerEvent::Connected(Err(e)));
+                        }
+                    }
                 }
-            },
-            WorkerCommand::ConnectAuto { probe, boot_mode } => {
-                match connect(&probes, probe, None, boot_mode, lang) {
+                WorkerCommand::ConnectManual {
+                    probe,
+                    target,
+                    boot_mode,
+                } => {
+                    rtt::stop(&mut rtt, &events, lang, "重新连接前已停止 RTT", "RTT stopped before reconnecting");
+                    match connect(&probes, probe, Some(target), boot_mode, lang) {
                     Ok((s, summary)) => {
                         session = Some(s);
                         let _ = events.send(WorkerEvent::Connected(Ok(summary)));
@@ -149,94 +188,89 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     Err(e) => {
                         let _ = events.send(WorkerEvent::Connected(Err(e)));
                     }
+                    }
                 }
-            }
-            WorkerCommand::ConnectManual {
-                probe,
-                target,
-                boot_mode,
-            } => match connect(&probes, probe, Some(target), boot_mode, lang) {
-                Ok((s, summary)) => {
-                    session = Some(s);
-                    let _ = events.send(WorkerEvent::Connected(Ok(summary)));
+                WorkerCommand::Flash {
+                    path,
+                    do_chip_erase,
+                    verify,
+                    keep_unwritten_bytes,
+                    reset_after,
+                } => {
+                    rtt::stop(&mut rtt, &events, lang, "烧录期间已停止 RTT", "RTT stopped during flashing");
+                    let result = match &mut session {
+                        Some(sess) => flash(
+                            sess,
+                            &path,
+                            do_chip_erase,
+                            verify,
+                            keep_unwritten_bytes,
+                            &events,
+                            lang,
+                        ),
+                        None => Err(lang.pick(
+                            "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                            "Not connected to a target. Auto-detect or select the target first"
+                                .to_owned(),
+                        )),
+                    };
+                    let result = result.and_then(|()| {
+                        if reset_after {
+                            reset(session.as_mut().expect("session must exist after flash"), lang)?;
+                        }
+                        Ok(())
+                    });
+                    let _ = events.send(WorkerEvent::OperationDone(result));
                 }
-                Err(e) => {
-                    let _ = events.send(WorkerEvent::Connected(Err(e)));
+                WorkerCommand::EraseAll => {
+                    rtt::stop(&mut rtt, &events, lang, "擦除期间已停止 RTT", "RTT stopped during erase");
+                    let result = match &mut session {
+                        Some(sess) => erase_flash(sess, &events, lang),
+                        None => Err(lang.pick(
+                            "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                            "Not connected to a target. Auto-detect or select the target first"
+                                .to_owned(),
+                        )),
+                    };
+                    let _ = events.send(WorkerEvent::OperationDone(result));
+                }
+                WorkerCommand::Reset => {
+                    let result = match &mut session {
+                        Some(sess) => reset(sess, lang),
+                        None => Err(lang.pick(
+                            "尚未连接到目标芯片".to_owned(),
+                            "Not connected to a target".to_owned(),
+                        )),
+                    };
+                    let _ = events.send(WorkerEvent::OperationDone(result));
+                }
+                WorkerCommand::Disconnect => {
+                    rtt::stop(&mut rtt, &events, lang, "", "");
+                    session = None;
+                    let _ = events.send(WorkerEvent::Status(lang.pick(
+                        "已断开连接".to_owned(),
+                        "Disconnected".to_owned(),
+                    )));
+                }
+                WorkerCommand::ScanFirmware { root } => {
+                    let (candidates, best) = scan_firmware(&root);
+                    let _ = events.send(WorkerEvent::FirmwareScanned {
+                        root: root.display().to_string(),
+                        candidates,
+                        best,
+                    });
+                }
+                WorkerCommand::SetLang(l) => lang = l,
+                WorkerCommand::RttStart => {
+                    rtt = rtt::start(&mut session, &events, lang);
+                }
+                WorkerCommand::RttStop => {
+                    rtt::stop(&mut rtt, &events, lang, "RTT 已停止", "RTT stopped");
+                }
+                WorkerCommand::RttWrite { data } => {
+                    rtt::write(&mut rtt, &mut session, &data, &events, lang);
                 }
             },
-            WorkerCommand::Flash {
-                path,
-                do_chip_erase,
-                verify,
-                keep_unwritten_bytes,
-                reset_after,
-            } => {
-                let result = match &mut session {
-                    Some(sess) => flash(
-                        sess,
-                        &path,
-                        do_chip_erase,
-                        verify,
-                        keep_unwritten_bytes,
-                        &events,
-                        lang,
-                    ),
-                    None => Err(lang.pick(
-                        "尚未连接到目标芯片，请先自动识别目标".to_owned(),
-                        "Not connected to a target. Auto-detect or select the target first"
-                            .to_owned(),
-                    )),
-                };
-                match result {
-                    Ok(()) => {
-                        if reset_after {
-                            let _ = reset(session.as_mut().expect("session 必须存在"), lang);
-                        }
-                        let _ = events.send(WorkerEvent::OperationDone(Ok(())));
-                    }
-                    Err(e) => {
-                        let _ = events.send(WorkerEvent::OperationDone(Err(e)));
-                    }
-                }
-            }
-            WorkerCommand::EraseAll => {
-                let result = match &mut session {
-                    Some(sess) => erase_flash(sess, &events, lang),
-                    None => Err(lang.pick(
-                        "尚未连接到目标芯片，请先自动识别目标".to_owned(),
-                        "Not connected to a target. Auto-detect or select the target first"
-                            .to_owned(),
-                    )),
-                };
-                let _ = events.send(WorkerEvent::OperationDone(result));
-            }
-            WorkerCommand::Reset => {
-                let result = match &mut session {
-                    Some(sess) => reset(sess, lang),
-                    None => Err(lang.pick(
-                        "尚未连接到目标芯片".to_owned(),
-                        "Not connected to a target".to_owned(),
-                    )),
-                };
-                let _ = events.send(WorkerEvent::OperationDone(result));
-            }
-            WorkerCommand::Disconnect => {
-                session = None;
-                let _ = events.send(WorkerEvent::Status(lang.pick(
-                    "已断开连接".to_owned(),
-                    "Disconnected".to_owned(),
-                )));
-            }
-            WorkerCommand::ScanFirmware { root } => {
-                let (candidates, best) = scan_firmware(&root);
-                let _ = events.send(WorkerEvent::FirmwareScanned {
-                    root: root.display().to_string(),
-                    candidates,
-                    best,
-                });
-            }
-            WorkerCommand::SetLang(l) => lang = l,
-            WorkerCommand::Shutdown => break,
         }
     }
 }
@@ -530,5 +564,4 @@ fn op_label(op: ProgressOperation, lang: Lang) -> &'static str {
         ProgressOperation::Fill => lang.pick("填充", "Fill"),
     }
 }
-
 

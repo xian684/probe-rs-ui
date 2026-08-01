@@ -21,6 +21,7 @@ It automatically detects debug probes, identifies target chips, supports manual 
 - ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
 - 🗑️ **Chip erase / target reset**: One-click operations.
 - 📊 **Progress display**: Real-time progress bars for erase, program, and verify; operations with an unknown total size (e.g. chip erase) show a spinner.
+- 📡 **RTT log monitor**: A bottom panel streams target RTT up-channel output in real time (channels are auto-labeled), and can send data to the target's down channel 0 via Enter or a button.
 - 🌐 **Bilingual UI**: Built-in CJK font loading (Microsoft YaHei / SimSun / PingFang / WenQuanYi); switch between 中文 and English from the top bar.
 - 🖼️ **Icons**: Buttons have icons and the window uses a chip-style icon.
 
