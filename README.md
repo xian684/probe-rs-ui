@@ -21,8 +21,8 @@
 - ⚙️ **可配置烧录选项**：全片擦除、烧录后校验、保留未写入字节、烧录后复位运行。
 - 🗑️ **全片擦除 / 目标复位**：一键操作。
 - 📊 **进度显示**：擦除、编程、校验等操作进度条实时更新；总大小未知的操作（如全片擦除）显示旋转指示。
-- 📡 **RTT 日志监控**：底部面板实时显示目标 RTT 上行通道输出（多通道自动标注），并支持向目标下行通道 0 发送数据（回车或按钮）。
-- 🌐 **中英文界面**：内置 CJK 字体加载（微软雅黑 / 宋体 / 苹方 / 文泉驿），顶栏可切换中文 / English。
+- 📡 **RTT 日志监控**：默认关闭；启用后底部面板实时显示目标 RTT 上行通道输出（多通道自动标注），并支持向目标下行通道 0 发送数据（回车或按钮）。
+- 🌐 **中英文界面**：自动加载 Windows、macOS 与 Linux 上可用的 CJK 系统字体，顶栏可切换中文 / English。
 - 🖼️ **图形化图标**：操作按钮带图标，程序窗口使用芯片样式图标。
 
 ## 系统要求
@@ -38,6 +38,10 @@ cargo build --release
 ```
 
 生成的可执行文件位于 `target/release/probe-rs-ui`（Windows 为 `probe-rs-ui.exe`），可直接双击运行。
+
+### Linux / macOS 构建包
+
+推送至 `master` 后，GitHub Actions 会自动生成 Linux x86_64、macOS Intel 和 macOS Apple Silicon 的 `.tar.gz` 包。构建完成后可在仓库的 [Actions](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml) 页面下载对应运行的 artifacts。
 
 ## 使用方法
 
