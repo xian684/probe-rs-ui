@@ -63,8 +63,12 @@ cargo build --release
 ```
 src/
 ├── main.rs    程序入口、窗口配置与图标
-├── app.rs     egui 界面、字体加载、事件处理
-├── worker.rs  后台工作线程：探针扫描、连接、烧录、擦除、复位、固件扫描
+├── app.rs     egui 界面、事件处理与面板渲染
+├── worker.rs  后台工作线程：探针扫描、连接、烧录、擦除、复位
+├── chips.rs   内置芯片库枚举与品牌分组
+├── firmware.rs 固件扫描与格式识别（ELF/HEX/BIN/UF2）
+├── rtt.rs     RTT 会话生命周期与通道读写
+├── fonts.rs   CJK 字体加载
 └── i18n.rs    语言支持（中文 / English）
 ```
 

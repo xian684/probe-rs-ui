@@ -63,8 +63,12 @@ Every push to `master` builds `.tar.gz` packages for Linux x86_64, macOS Intel, 
 ```
 src/
 ├── main.rs    Entry point, window configuration and icon
-├── app.rs     egui UI, font loading, event handling
-├── worker.rs  Background thread: probe scan, connect, flash, erase, reset, firmware scan
+├── app.rs     egui UI, event handling and panel rendering
+├── worker.rs  Background thread: probe scan, connect, flash, erase, reset
+├── chips.rs   Built-in chip database enumeration and brand grouping
+├── firmware.rs Firmware scanning and format detection (ELF/HEX/BIN/UF2)
+├── rtt.rs     RTT session lifecycle and channel I/O
+├── fonts.rs   CJK font loading
 └── i18n.rs    Language support (中文 / English)
 ```
 
