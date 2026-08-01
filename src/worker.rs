@@ -500,14 +500,35 @@ fn is_ignored_dir(name: &str, in_target: bool) -> bool {
 }
 
 fn firmware_kind(path: &Path) -> Option<&'static str> {
-    let ext = path.extension()?.to_str()?.to_lowercase();
-    match ext.as_str() {
-        "elf" | "axf" => Some("ELF"),
-        "hex" => Some("HEX"),
-        "bin" => Some("BIN"),
-        "uf2" => Some("UF2"),
-        _ => None,
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase());
+    match ext.as_deref() {
+        Some("elf") | Some("axf") => Some("ELF"),
+        Some("hex") => Some("HEX"),
+        Some("bin") => Some("BIN"),
+        Some("uf2") => Some("UF2"),
+        _ => {
+            // Rust 编译产物通常没有扩展名，但仍是 ELF 文件：按魔数识别。
+            if ext.is_none() && is_elf(path) {
+                Some("ELF")
+            } else {
+                None
+            }
+        }
     }
+}
+
+/// 判断文件是否为 ELF 二进制（通过魔数 0x7F 'E' 'L' 'F' 识别）。
+pub fn is_elf(path: &Path) -> bool {
+    use std::io::Read;
+    let mut f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let mut magic = [0u8; 4];
+    f.read_exact(&mut magic).is_ok() && magic == [0x7F, b'E', b'L', b'F']
 }
 
 /// 依据文件类型与所在目录对候选固件打分，得分高者优先。
@@ -670,39 +691,35 @@ fn flash(
     options.verify = verify;
     options.keep_unwritten_bytes = keep_unwritten_bytes;
 
-    let result = match ext.as_str() {
-        "elf" | "axf" => {
-            probe_rs::flashing::download_file_with_options(
-                session,
-                path,
-                ElfLoader(ElfOptions::default()),
-                options,
-            )
-        }
-        "hex" => {
-            probe_rs::flashing::download_file_with_options(session, path, HexLoader, options)
-        }
-        "bin" => {
-            probe_rs::flashing::download_file_with_options(
-                session,
-                path,
-                BinLoader(BinOptions::default()),
-                options,
-            )
-        }
-        "uf2" => {
-            probe_rs::flashing::download_file_with_options(session, path, Uf2Loader, options)
-        }
-        _ => {
-            return Err(lang.pick(
-                format!(
-                    "不支持的文件格式: .{ext}，请选择 .elf / .hex / .bin / .uf2 文件"
-                ),
-                format!(
-                    "Unsupported file format: .{ext}. Choose a .elf / .hex / .bin / .uf2 file"
-                ),
-            ))
-        }
+    let is_elf_file = matches!(ext.as_str(), "elf" | "axf") || (ext.is_empty() && is_elf(path));
+
+    let result = if is_elf_file {
+        probe_rs::flashing::download_file_with_options(
+            session,
+            path,
+            ElfLoader(ElfOptions::default()),
+            options,
+        )
+    } else if ext == "hex" {
+        probe_rs::flashing::download_file_with_options(session, path, HexLoader, options)
+    } else if ext == "bin" {
+        probe_rs::flashing::download_file_with_options(
+            session,
+            path,
+            BinLoader(BinOptions::default()),
+            options,
+        )
+    } else if ext == "uf2" {
+        probe_rs::flashing::download_file_with_options(session, path, Uf2Loader, options)
+    } else {
+        return Err(lang.pick(
+            format!(
+                "不支持的文件格式: .{ext}，请选择 .elf / .hex / .bin / .uf2 文件"
+            ),
+            format!(
+                "Unsupported file format: .{ext}. Choose a .elf / .hex / .bin / .uf2 file"
+            ),
+        ));
     };
 
     result.map_err(|e| {
@@ -844,6 +861,32 @@ mod tests {
         let first = cands.first().unwrap().path.to_string_lossy().to_lowercase();
         assert!(first.contains("release"), "expected release build, got {first}");
         assert_eq!(cands.len(), 2, "build dir must be scanned outside cargo target");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scan_detects_extensionless_elf() {
+        let root = std::env::temp_dir().join("probe-rs-ui-test-elf");
+        let _ = std::fs::remove_dir_all(&root);
+        let mut bytes = vec![0x7F, b'E', b'L', b'F'];
+        bytes.extend_from_slice(&[0u8; 4096]);
+        write(
+            &root.join("target/thumbv7em-none-eabihf/release/myapp"),
+            &bytes,
+        );
+        write(&root.join("target/thumbv7em-none-eabihf/debug/myapp"), &bytes);
+        write(&root.join("src/main.rs"), &[]);
+
+        let (cands, best) = scan_firmware(&root);
+        assert_eq!(best, Some(0));
+        assert!(!cands.is_empty(), "extensionless ELF must be detected");
+        let first = cands.first().unwrap();
+        assert_eq!(first.kind, "ELF");
+        let p = first.path.to_string_lossy().to_lowercase();
+        assert!(
+            p.contains("release") && p.ends_with("myapp"),
+            "expected release extensionless ELF, got {p}"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

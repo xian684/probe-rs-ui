@@ -335,16 +335,21 @@ impl ProbeUiApp {
     }
 
     fn detected_format(&self) -> Option<&'static str> {
-        let ext = std::path::Path::new(&self.file_path)
-            .extension()?
-            .to_str()?
-            .to_lowercase();
-        match ext.as_str() {
-            "elf" | "axf" => Some("ELF"),
-            "hex" => Some("Intel HEX"),
-            "bin" => Some("Binary"),
-            "uf2" => Some("UF2"),
-            _ => None,
+        let path = std::path::Path::new(&self.file_path);
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            match ext.to_lowercase().as_str() {
+                "elf" | "axf" => return Some("ELF"),
+                "hex" => return Some("Intel HEX"),
+                "bin" => return Some("Binary"),
+                "uf2" => return Some("UF2"),
+                _ => {}
+            }
+        }
+        // 无扩展名的 Rust 编译产物：按 ELF 魔数识别。
+        if worker::is_elf(path) {
+            Some("ELF")
+        } else {
+            None
         }
     }
 
