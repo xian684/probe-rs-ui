@@ -8,16 +8,16 @@ It automatically detects debug probes, identifies target chips, supports manual 
 
 ## Features
 
-- **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).
-- **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
-- **Manual chip selection**: Full built-in probe-rs chip database with real-time keyword search, grouped by chip family and variant (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
-- **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
-- **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`.
-- **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
-- **Chip erase / target reset**: One-click operations.
-- **Progress display**: Real-time progress bars for erase, program, and verify.
-- **Bilingual UI**: Built-in CJK font loading (Microsoft YaHei / SimSun / PingFang / WenQuanYi); switch between 中文 and English from the top bar.
-- **Icons**: Buttons have icons and the window uses a chip-style icon.
+- 🔍 **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).
+- 🎯 **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
+- 🧩 **Manual chip selection**: Full built-in probe-rs chip database with real-time keyword search, grouped by chip family and variant (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
+- 📁 **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
+- ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`.
+- ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
+- 🗑️ **Chip erase / target reset**: One-click operations.
+- 📊 **Progress display**: Real-time progress bars for erase, program, and verify.
+- 🌐 **Bilingual UI**: Built-in CJK font loading (Microsoft YaHei / SimSun / PingFang / WenQuanYi); switch between 中文 and English from the top bar.
+- 🖼️ **Icons**: Buttons have icons and the window uses a chip-style icon.
 
 ## Requirements
 
