@@ -564,7 +564,7 @@ impl eframe::App for ProbeUiApp {
                     let hint = self.t("如 stm32f103 / nrf52840", "e.g. stm32f103 / nrf52840");
                     ui.add(
                         egui::TextEdit::singleline(&mut self.chip_search)
-                            .desired_width(300.0)
+                            .desired_width(f32::INFINITY)
                             .font(egui::TextStyle::Small)
                             .hint_text(hint),
                     );
