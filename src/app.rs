@@ -4,10 +4,11 @@ use std::time::Duration;
 
 use eframe::egui;
 
+use crate::chips::{ChipBrandInfo, ChipFamilyInfo};
+use crate::firmware::FirmwareCandidate;
 use crate::i18n::Lang;
 use crate::worker::{
-    self, BootMode, ChipBrandInfo, ChipFamilyInfo, FirmwareCandidate, OpState, ProbeInfo,
-    TargetSummary, WorkerCommand, WorkerEvent,
+    self, BootMode, OpState, ProbeInfo, TargetSummary, WorkerCommand, WorkerEvent,
 };
 
 #[derive(Clone, Copy)]
@@ -67,35 +68,10 @@ pub struct ProbeUiApp {
 }
 
 impl ProbeUiApp {
-    pub fn setup(ctx: &egui::Context) {
-        let mut fonts = egui::FontDefinitions::default();
-        let candidates = [
-            r"C:\Windows\Fonts\msyh.ttc",
-            r"C:\Windows\Fonts\msyhbd.ttc",
-            r"C:\Windows\Fonts\simhei.ttf",
-            r"C:\Windows\Fonts\simsun.ttc",
-            "/System/Library/Fonts/PingFang.ttc",
-            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-        ];
-        for path in candidates {
-            if let Ok(bytes) = std::fs::read(path) {
-                fonts.font_data.insert("cjk".to_owned(), egui::FontData::from_owned(bytes).into());
-                if let Some(fam) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
-                    fam.push("cjk".to_owned());
-                }
-                if let Some(fam) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
-                    fam.push("cjk".to_owned());
-                }
-                break;
-            }
-        }
-        ctx.set_fonts(fonts);
-    }
-
     pub fn new() -> Self {
         let worker = worker::spawn(Lang::Zh);
-        let chip_families = worker::builtin_chip_families();
-        let chip_brands = worker::group_brands(&chip_families);
+        let chip_families = crate::chips::builtin_chip_families();
+        let chip_brands = crate::chips::group_brands(&chip_families);
         let mut app = ProbeUiApp {
             to_worker: worker.sender,
             from_worker: worker.receiver,
@@ -348,7 +324,7 @@ impl ProbeUiApp {
             }
         }
         // 无扩展名的 Rust 编译产物：按 ELF 魔数识别。
-        if worker::is_elf(path) {
+        if crate::firmware::is_elf(path) {
             Some("ELF")
         } else {
             None
@@ -701,7 +677,7 @@ impl eframe::App for ProbeUiApp {
                                     .weak(),
                                 );
                             } else {
-                                for (_, (bi, fams)) in brand_fams.iter().enumerate() {
+                                for (bi, fams) in brand_fams.iter() {
                                     let brand = &self.chip_brands[*bi];
                                     let selected = Some(*bi) == sel_brand;
                                     let label = format!(

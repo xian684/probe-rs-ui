@@ -1,6 +1,9 @@
 #![windows_subsystem = "windows"]
 
 mod app;
+mod chips;
+mod firmware;
+mod fonts;
 mod i18n;
 mod worker;
 
@@ -72,7 +75,7 @@ fn main() -> Result<(), eframe::Error> {
         "Probe-rs 烧录工具",
         options,
         Box::new(|cc| {
-            app::ProbeUiApp::setup(&cc.egui_ctx);
+            fonts::setup(&cc.egui_ctx);
             Ok(Box::new(app::ProbeUiApp::new()) as Box<dyn eframe::App>)
         }),
     )
