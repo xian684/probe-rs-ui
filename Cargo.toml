@@ -1,0 +1,13 @@
+[package]
+name = "probe-rs-ui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.31"
+probe-rs = "0.32"
+rfd = "0.17"
+
+[profile.release]
+lto = true
+strip = true
