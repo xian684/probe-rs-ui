@@ -442,7 +442,7 @@ impl eframe::App for ProbeUiApp {
 
                 egui::ScrollArea::vertical()
                     .id_salt("chip_list")
-                    .max_height(170.0)
+                    .max_height(320.0)
                     .show(ui, |ui| {
                         if matches.is_empty() {
                             ui.label(egui::RichText::new("未找到匹配的芯片型号").weak());
