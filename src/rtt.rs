@@ -146,6 +146,7 @@ pub fn poll(
 pub fn write(
     rtt: &mut Option<Handle>,
     session: &mut Option<Session>,
+    channel: usize,
     data: &[u8],
     events: &mpsc::Sender<WorkerEvent>,
     lang: Lang,
@@ -171,7 +172,7 @@ pub fn write(
             return;
         }
     };
-    match rtt.down_channel(0) {
+    match rtt.down_channel(channel) {
         Some(channel) => match channel.write(&mut core, data) {
             Ok(n) if n < data.len() => status(
                 events,

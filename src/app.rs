@@ -19,6 +19,23 @@ pub(crate) enum LogLevel {
     Error,
 }
 
+/// 界面主题模式。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ThemeMode {
+    /// 跟随系统深色/浅色主题。
+    System,
+    Light,
+    Dark,
+}
+
+/// 中央面板显示的视图。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CentralTab {
+    Flash,
+    Memory,
+    Rtt,
+}
+
 pub(crate) struct LogEntry {
     pub(crate) text: String,
     pub(crate) level: LogLevel,
@@ -36,6 +53,8 @@ pub struct ProbeUiApp {
     pub(crate) from_worker: Receiver<WorkerEvent>,
 
     pub(crate) lang: Lang,
+    pub(crate) theme_mode: ThemeMode,
+    pub(crate) theme_applied: Option<egui::ThemePreference>,
 
     pub(crate) probes: Vec<ProbeInfo>,
     pub(crate) selected_probe: usize,
@@ -71,12 +90,15 @@ pub struct ProbeUiApp {
     pub(crate) log: Vec<LogEntry>,
 
     pub(crate) rtt_on: bool,
-    pub(crate) rtt_enabled: bool,
+    pub(crate) rtt_up_channels: usize,
+    pub(crate) rtt_down_channels: usize,
+    pub(crate) rtt_view_channel: Option<usize>,
+    pub(crate) rtt_send_channel: usize,
     pub(crate) rtt_buf: String,
     pub(crate) rtt_autoscroll: bool,
     pub(crate) rtt_down_input: String,
 
-    pub(crate) mem_mode: bool,
+    pub(crate) central_tab: CentralTab,
     pub(crate) mem_start: u64,
     pub(crate) mem_len: usize,
     pub(crate) mem_data: Vec<u8>,
@@ -95,6 +117,8 @@ impl ProbeUiApp {
             to_worker: worker.sender,
             from_worker: worker.receiver,
             lang: Lang::Zh,
+            theme_mode: ThemeMode::System,
+            theme_applied: None,
             probes: Vec::new(),
             selected_probe: 0,
             probing: true,
@@ -123,11 +147,14 @@ impl ProbeUiApp {
             op_bars: Vec::new(),
             log: Vec::new(),
             rtt_on: false,
-            rtt_enabled: false,
+            rtt_up_channels: 0,
+            rtt_down_channels: 0,
+            rtt_view_channel: None,
+            rtt_send_channel: 0,
             rtt_buf: String::new(),
             rtt_autoscroll: true,
             rtt_down_input: String::new(),
-            mem_mode: false,
+            central_tab: CentralTab::Flash,
             mem_start: 0,
             mem_len: 256,
             mem_data: Vec::new(),
@@ -187,6 +214,13 @@ impl ProbeUiApp {
         if self.lang != lang {
             self.lang = lang;
             self.send(WorkerCommand::SetLang(lang));
+        }
+    }
+
+    pub(crate) fn set_theme(&mut self, mode: ThemeMode) {
+        if self.theme_mode != mode {
+            self.theme_mode = mode;
+            self.theme_applied = None;
         }
     }
 
@@ -350,8 +384,14 @@ impl ProbeUiApp {
             }
             WorkerEvent::RttData { channel, data } => {
                 let text = String::from_utf8_lossy(&data);
-                self.rtt_buf.push_str(&format!("[CH{}] ", channel));
-                self.rtt_buf.push_str(&text);
+                match self.rtt_view_channel {
+                    Some(view) if view != channel => {}
+                    Some(_) => self.rtt_buf.push_str(&text),
+                    None => {
+                        self.rtt_buf.push_str(&format!("[CH{}] ", channel));
+                        self.rtt_buf.push_str(&text);
+                    }
+                }
                 const RTT_BUF_CAP: usize = 128 * 1024;
                 if self.rtt_buf.len() > RTT_BUF_CAP {
                     let overflow = self.rtt_buf.len() - RTT_BUF_CAP;
@@ -364,6 +404,16 @@ impl ProbeUiApp {
                 down_channels,
             } => {
                 self.rtt_on = true;
+                self.rtt_up_channels = up_channels;
+                self.rtt_down_channels = down_channels;
+                if let Some(v) = self.rtt_view_channel {
+                    if v >= up_channels {
+                        self.rtt_view_channel = None;
+                    }
+                }
+                if self.rtt_send_channel >= down_channels.max(1) {
+                    self.rtt_send_channel = 0;
+                }
                 self.log_ok(self.lang.pick(
                     format!("RTT 已启动（上行 {up_channels}，下行 {down_channels}）"),
                     format!("RTT started ({} up, {} down)", up_channels, down_channels),
@@ -507,6 +557,16 @@ impl Drop for ProbeUiApp {
 
 impl eframe::App for ProbeUiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let pref = match self.theme_mode {
+            ThemeMode::System => egui::ThemePreference::System,
+            ThemeMode::Light => egui::ThemePreference::Light,
+            ThemeMode::Dark => egui::ThemePreference::Dark,
+        };
+        if self.theme_applied != Some(pref) {
+            ctx.set_theme(pref);
+            self.theme_applied = Some(pref);
+        }
+
         while let Ok(ev) = self.from_worker.try_recv() {
             self.handle_event(ev);
         }
@@ -517,7 +577,6 @@ impl eframe::App for ProbeUiApp {
 
         self.top_panel(ctx);
         self.device_panel(ctx);
-        self.rtt_panel(ctx);
         self.central_panel(ctx);
     }
 }

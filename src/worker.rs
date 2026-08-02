@@ -106,6 +106,7 @@ pub enum WorkerCommand {
     RttStart,
     RttStop,
     RttWrite {
+        channel: usize,
         data: Vec<u8>,
     },
 }
@@ -369,8 +370,8 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                 WorkerCommand::RttStop => {
                     rtt::stop(&mut rtt, &events, lang, "RTT 已停止", "RTT stopped");
                 }
-                WorkerCommand::RttWrite { data } => {
-                    rtt::write(&mut rtt, &mut session, &data, &events, lang);
+                WorkerCommand::RttWrite { channel, data } => {
+                    rtt::write(&mut rtt, &mut session, channel, &data, &events, lang);
                 }
             },
         }
