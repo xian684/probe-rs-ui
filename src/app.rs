@@ -256,6 +256,19 @@ impl ProbeUiApp {
             BootMode::Normal
         };
         self.manual_target = cfg.manual_target;
+        if !self.manual_target.trim().is_empty() {
+            if let Some(family_idx) = self
+                .chip_families
+                .iter()
+                .position(|f| f.chips.iter().any(|c| c == &self.manual_target))
+            {
+                self.selected_family = Some(family_idx);
+                self.selected_brand = self
+                    .chip_brands
+                    .iter()
+                    .position(|b| b.families.contains(&family_idx));
+            }
+        }
         self.file_path = cfg.file_path;
         self.firmware_root = cfg.firmware_root;
         self.chip_erase = cfg.chip_erase;
