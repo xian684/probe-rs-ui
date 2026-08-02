@@ -1,15 +1,19 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use eframe::egui;
 
 use crate::chips::{ChipBrandInfo, ChipFamilyInfo};
+use crate::config::{self, AppConfig};
 use crate::firmware::FirmwareCandidate;
 use crate::i18n::Lang;
 use crate::worker::{
     self, BootMode, OpState, ProbeInfo, TargetSummary, WorkerCommand, WorkerEvent,
 };
+
+/// 左栏『目标信息』框与中央底部日志框对齐时的最小高度。
+pub(crate) const TARGET_INFO_MIN_H: f32 = 220.0;
 
 #[derive(Clone, Copy)]
 pub(crate) enum LogLevel {
@@ -106,6 +110,12 @@ pub struct ProbeUiApp {
     pub(crate) mem_busy: bool,
     pub(crate) mem_write_start: u64,
     pub(crate) mem_write_input: String,
+
+    last_save: Instant,
+    win_size: Option<[f32; 2]>,
+    win_pos: Option<[f32; 2]>,
+    win_clamped: bool,
+    pub(crate) target_info_h: f32,
 }
 
 impl ProbeUiApp {
@@ -113,6 +123,7 @@ impl ProbeUiApp {
         let worker = worker::spawn(Lang::Zh);
         let chip_families = crate::chips::builtin_chip_families();
         let chip_brands = crate::chips::group_brands(&chip_families);
+        let saved = config::load();
         let mut app = ProbeUiApp {
             to_worker: worker.sender,
             from_worker: worker.receiver,
@@ -162,7 +173,13 @@ impl ProbeUiApp {
             mem_busy: false,
             mem_write_start: 0,
             mem_write_input: String::new(),
+            last_save: Instant::now(),
+            win_size: saved.window_size,
+            win_pos: saved.window_pos,
+            win_clamped: false,
+            target_info_h: 180.0,
         };
+        app.apply_config(saved);
         app.log(
             app.lang.pick(
                 format!(
@@ -221,6 +238,100 @@ impl ProbeUiApp {
         if self.theme_mode != mode {
             self.theme_mode = mode;
             self.theme_applied = None;
+        }
+    }
+
+    /// 将已保存的配置应用到界面状态。
+    fn apply_config(&mut self, cfg: AppConfig) {
+        self.lang = if cfg.lang == "en" { Lang::En } else { Lang::Zh };
+        self.theme_mode = match cfg.theme.as_str() {
+            "light" => ThemeMode::Light,
+            "dark" => ThemeMode::Dark,
+            _ => ThemeMode::System,
+        };
+        self.theme_applied = None;
+        self.boot_mode = if cfg.boot_mode == "under_reset" {
+            BootMode::UnderReset
+        } else {
+            BootMode::Normal
+        };
+        self.manual_target = cfg.manual_target;
+        self.file_path = cfg.file_path;
+        self.firmware_root = cfg.firmware_root;
+        self.chip_erase = cfg.chip_erase;
+        self.verify = cfg.verify;
+        self.keep_unwritten = cfg.keep_unwritten;
+        self.reset_after = cfg.reset_after;
+        self.bin_base = cfg.bin_base;
+        self.rtt_view_channel = cfg.rtt_view_channel;
+        self.rtt_send_channel = cfg.rtt_send_channel;
+        self.rtt_autoscroll = cfg.rtt_autoscroll;
+        self.central_tab = match cfg.central_tab.as_str() {
+            "memory" => CentralTab::Memory,
+            "rtt" => CentralTab::Rtt,
+            _ => CentralTab::Flash,
+        };
+        self.mem_start = cfg.mem_start;
+        self.mem_len = cfg.mem_len;
+        self.mem_write_start = cfg.mem_write_start;
+        self.send(WorkerCommand::SetLang(self.lang));
+        if !self.firmware_root.trim().is_empty() {
+            self.firmware_scanning = true;
+            self.send(WorkerCommand::ScanFirmware {
+                root: PathBuf::from(self.firmware_root.clone()),
+            });
+        }
+    }
+
+    /// 收集当前界面状态（含窗口尺寸/位置）用于保存。
+    fn collect_config(&mut self, ctx: &egui::Context) -> AppConfig {
+        let (size, pos) = ctx.input(|i| {
+            let rect = i.viewport().outer_rect;
+            let size = rect.map(|r| [r.width(), r.height()]);
+            let pos = rect.map(|r| [r.min.x, r.min.y]);
+            (size, pos)
+        });
+        if let Some(s) = size {
+            self.win_size = Some(s);
+        }
+        if let Some(p) = pos {
+            self.win_pos = Some(p);
+        }
+        AppConfig {
+            lang: if self.lang.is_en() { "en" } else { "zh" }.into(),
+            theme: match self.theme_mode {
+                ThemeMode::System => "system",
+                ThemeMode::Light => "light",
+                ThemeMode::Dark => "dark",
+            }
+            .into(),
+            boot_mode: match self.boot_mode {
+                BootMode::Normal => "normal",
+                BootMode::UnderReset => "under_reset",
+            }
+            .into(),
+            manual_target: self.manual_target.clone(),
+            file_path: self.file_path.clone(),
+            firmware_root: self.firmware_root.clone(),
+            chip_erase: self.chip_erase,
+            verify: self.verify,
+            keep_unwritten: self.keep_unwritten,
+            reset_after: self.reset_after,
+            bin_base: self.bin_base,
+            rtt_view_channel: self.rtt_view_channel,
+            rtt_send_channel: self.rtt_send_channel,
+            rtt_autoscroll: self.rtt_autoscroll,
+            central_tab: match self.central_tab {
+                CentralTab::Flash => "flash",
+                CentralTab::Memory => "memory",
+                CentralTab::Rtt => "rtt",
+            }
+            .into(),
+            mem_start: self.mem_start,
+            mem_len: self.mem_len,
+            mem_write_start: self.mem_write_start,
+            window_size: self.win_size,
+            window_pos: self.win_pos,
         }
     }
 
@@ -447,7 +558,10 @@ impl ProbeUiApp {
     }
 
     pub(crate) fn detected_format(&self) -> Option<&'static str> {
-        let path = std::path::Path::new(&self.file_path);
+        self.detected_format_of(std::path::Path::new(&self.file_path))
+    }
+
+    pub(crate) fn detected_format_of(&self, path: &std::path::Path) -> Option<&'static str> {
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             match ext.to_lowercase().as_str() {
                 "elf" | "axf" => return Some("ELF"),
@@ -466,7 +580,11 @@ impl ProbeUiApp {
     }
 
     pub(crate) fn start_flash(&mut self) {
-        if self.detected_format().is_none() {
+        self.flash_file(PathBuf::from(self.file_path.clone()), self.bin_base);
+    }
+
+    pub(crate) fn flash_file(&mut self, path: PathBuf, bin_base: u64) {
+        if self.detected_format_of(&path).is_none() {
             self.log_err(self.t(
                 "不支持的文件格式，请选择 .elf / .hex / .bin / .uf2 文件",
                 "Unsupported file format. Choose a .elf / .hex / .bin / .uf2 file",
@@ -476,16 +594,16 @@ impl ProbeUiApp {
         self.busy = true;
         self.op_bars.clear();
         self.log_info(self.lang.pick(
-            format!("开始烧录: {}", self.file_path),
-            format!("Flashing: {}", self.file_path),
+            format!("开始烧录: {}", path.display()),
+            format!("Flashing: {}", path.display()),
         ));
         self.send(WorkerCommand::Flash {
-            path: PathBuf::from(self.file_path.clone()),
+            path,
             do_chip_erase: self.chip_erase,
             verify: self.verify,
             keep_unwritten_bytes: self.keep_unwritten,
             reset_after: self.reset_after,
-            bin_base: self.bin_base,
+            bin_base,
         });
     }
 
@@ -567,8 +685,37 @@ impl eframe::App for ProbeUiApp {
             self.theme_applied = Some(pref);
         }
 
+        // 窗口尺寸/位置钳制：超出屏幕则自动缩放并居中。
+        // 注意：pixels_per_point() 必须在 ctx.input 闭包之外调用，
+        // 否则会在闭包内再次获取 Context 写锁导致死锁。
+        if !self.win_clamped {
+            let info = ctx.input(|i| {
+                let m = i.viewport().monitor_size?;
+                Some((m, i.viewport().outer_rect))
+            });
+            if let Some((m, Some(r))) = info {
+                self.win_clamped = true;
+                let cur = r.size();
+                let w = cur.x.min(m.x * 0.98);
+                let h = cur.y.min(m.y * 0.98);
+                if w < cur.x || h < cur.y {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(w, h)));
+                }
+                let off_screen = r.min.x < 0.0 || r.min.y < 0.0 || r.max.x > m.x || r.max.y > m.y;
+                if off_screen {
+                    let pos = egui::pos2((m.x - w) / 2.0, (m.y - h) / 2.0);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(pos));
+                }
+            }
+        }
+
         while let Ok(ev) = self.from_worker.try_recv() {
             self.handle_event(ev);
+        }
+
+        if self.last_save.elapsed() >= Duration::from_secs(2) {
+            self.last_save = Instant::now();
+            config::save(&self.collect_config(ctx));
         }
 
         if self.probing || self.connecting || self.busy || self.rtt_on || self.mem_busy {
@@ -577,6 +724,7 @@ impl eframe::App for ProbeUiApp {
 
         self.top_panel(ctx);
         self.device_panel(ctx);
+        self.log_panel(ctx);
         self.central_panel(ctx);
     }
 }

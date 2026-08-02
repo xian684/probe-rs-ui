@@ -2,6 +2,7 @@
 
 mod app;
 mod chips;
+mod config;
 mod firmware;
 mod fonts;
 mod i18n;
@@ -66,11 +67,19 @@ fn app_icon() -> eframe::egui::IconData {
 }
 
 fn main() -> Result<(), eframe::Error> {
+    let saved = config::load();
+    let mut viewport = eframe::egui::ViewportBuilder::default()
+        .with_inner_size([1440.0, 900.0])
+        .with_min_inner_size([960.0, 600.0])
+        .with_icon(app_icon());
+    if let Some(pos) = saved.window_pos {
+        // 仅当坐标在合理范围内才恢复窗口位置，避免显示器变更后窗口落到屏幕外。
+        if pos[0] >= 0.0 && pos[0] <= 20000.0 && pos[1] >= 0.0 && pos[1] <= 20000.0 {
+            viewport = viewport.with_position(eframe::egui::pos2(pos[0], pos[1]));
+        }
+    }
     let options = eframe::NativeOptions {
-        viewport: eframe::egui::ViewportBuilder::default()
-            .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([980.0, 600.0])
-            .with_icon(app_icon()),
+        viewport,
         ..Default::default()
     };
     eframe::run_native(

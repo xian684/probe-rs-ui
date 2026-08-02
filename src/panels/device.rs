@@ -2,7 +2,7 @@
 
 use eframe::egui;
 
-use crate::app::ProbeUiApp;
+use crate::app::{ProbeUiApp, TARGET_INFO_MIN_H};
 use crate::worker::{BootMode, WorkerCommand};
 
 impl ProbeUiApp {
@@ -10,15 +10,28 @@ impl ProbeUiApp {
     pub(crate) fn device_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("detect_panel")
             .resizable(false)
-            .default_width(520.0)
-            .show(ctx, |ui| self.device_panel_ui(ui));
+            .default_width(440.0)
+            .show(ctx, |ui| {
+                egui::TopBottomPanel::bottom("target_info_pinned")
+                    .resizable(false)
+                    .min_height(TARGET_INFO_MIN_H)
+                    .show_inside(ui, |ui| {
+                        let rect = ui.scope(|ui| self.target_info_ui(ui)).response.rect;
+                        self.target_info_h = rect.height();
+                    });
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    ui.add_space(6.0);
+                    ui.heading(self.t("设备检测", "Device Detection"));
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .id_salt("device_scroll")
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| self.device_panel_ui(ui));
+                });
+            });
     }
 
     fn device_panel_ui(&mut self, ui: &mut egui::Ui) {
-        ui.add_space(6.0);
-        ui.heading(self.t("设备检测", "Device Detection"));
-        ui.separator();
-
         ui.horizontal(|ui| {
             ui.label(self.t("调试探针:", "Probe:"));
             egui::ComboBox::from_id_salt("probe_sel")
@@ -243,7 +256,7 @@ impl ProbeUiApp {
             let mut picked_brand: Option<(usize, Option<usize>)> = None;
             egui::ScrollArea::vertical()
                 .id_salt("brand_list")
-                .max_height(300.0)
+                .max_height(220.0)
                 .show(&mut cols[0], |ui| {
                     if brand_fams.is_empty() {
                         ui.label(
@@ -266,7 +279,7 @@ impl ProbeUiApp {
             let mut picked_family: Option<usize> = None;
             egui::ScrollArea::vertical()
                 .id_salt("fam_list")
-                .max_height(300.0)
+                .max_height(220.0)
                 .show(&mut cols[1], |ui| {
                     if fam_matches.is_empty() {
                         ui.label(
@@ -293,7 +306,7 @@ impl ProbeUiApp {
             let mut picked_chip: Option<String> = None;
             egui::ScrollArea::vertical()
                 .id_salt("chip_list")
-                .max_height(300.0)
+                .max_height(220.0)
                 .show(&mut cols[2], |ui| {
                     match fam_index.and_then(|i| self.chip_families.get(i)) {
                         Some(fam) => {
@@ -382,8 +395,10 @@ impl ProbeUiApp {
                 boot_mode: self.boot_mode,
             });
         }
-        ui.add_space(4.0);
+    }
 
+    /// 左栏底部固定显示的目标信息框（连接成功后展示芯片与内存映射）。
+    fn target_info_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.separator();
         match &self.connected {
@@ -425,8 +440,12 @@ impl ProbeUiApp {
                     });
             }
             None => {
-                ui.label(egui::RichText::new(self.t("尚未连接目标", "Not connected")).weak());
+                ui.label(
+                    egui::RichText::new(self.t("尚未连接目标", "Not connected")).weak(),
+                );
             }
         }
+        let pad = (TARGET_INFO_MIN_H - ui.min_rect().height()).max(0.0);
+        ui.add_space(pad);
     }
 }

@@ -2,7 +2,7 @@
 
 use eframe::egui;
 
-use crate::app::{LogLevel, ProbeUiApp};
+use crate::app::ProbeUiApp;
 use crate::worker::{OpState, WorkerCommand};
 
 impl ProbeUiApp {
@@ -282,23 +282,5 @@ impl ProbeUiApp {
                 }
             }
         }
-
-        ui.add_space(10.0);
-        ui.label(egui::RichText::new(self.t("日志", "Log")).strong());
-        egui::ScrollArea::vertical()
-            .id_salt("log_scroll")
-            .auto_shrink([false, false])
-            .stick_to_bottom(true)
-            .show(ui, |ui| {
-                for e in &self.log {
-                    let color = match e.level {
-                        LogLevel::Info => egui::Color32::from_gray(180),
-                        LogLevel::Ok => egui::Color32::from_rgb(0x2e, 0xa0, 0x43),
-                        LogLevel::Warn => egui::Color32::from_rgb(0xcc, 0x88, 0x00),
-                        LogLevel::Error => egui::Color32::from_rgb(0xc0, 0x3a, 0x2b),
-                    };
-                    ui.label(egui::RichText::new(&e.text).color(color));
-                }
-            });
     }
 }
