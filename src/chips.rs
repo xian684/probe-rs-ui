@@ -194,7 +194,11 @@ mod tests {
         let families = builtin_chip_families();
         let brands = group_brands(&families);
         let total: usize = brands.iter().map(|b| b.families.len()).sum();
-        assert_eq!(total, families.len(), "every family must be assigned to a brand");
+        assert_eq!(
+            total,
+            families.len(),
+            "every family must be assigned to a brand"
+        );
 
         let mut others: Vec<&str> = brands
             .iter()

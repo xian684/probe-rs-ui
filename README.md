@@ -6,10 +6,6 @@
 
 > English docs: [README-en.md](README-en.md)
 
-## 界面截图
-
-![界面截图](docs/screenshot.png)
-
 ## 功能特性
 
 - 🔍 **探针自动扫描**：自动枚举已连接的调试探针（ST-Link、J-Link、DAPLink / CMSIS-DAP 等）。
@@ -61,9 +57,13 @@ cargo build --release
 ## 项目结构
 
 ```
+build.rs
+assets/
+  └── icon.ico     Windows 程序图标
 src/
 ├── main.rs    程序入口、窗口配置与图标
-├── app.rs     egui 界面、事件处理与面板渲染
+├── app.rs     应用状态、事件处理与主循环
+├── app/panels/ 界面面板渲染（top / device / rtt_panel / flash）
 ├── worker.rs  后台工作线程：探针扫描、连接、烧录、擦除、复位
 ├── chips.rs   内置芯片库枚举与品牌分组
 ├── firmware.rs 固件扫描与格式识别（ELF/HEX/BIN/UF2）

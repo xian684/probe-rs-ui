@@ -64,8 +64,15 @@ pub enum BootMode {
 /// 发送给后台工作线程的命令。
 pub enum WorkerCommand {
     Scan,
-    ConnectAuto { probe: usize, boot_mode: BootMode },
-    ConnectManual { probe: usize, target: String, boot_mode: BootMode },
+    ConnectAuto {
+        probe: usize,
+        boot_mode: BootMode,
+    },
+    ConnectManual {
+        probe: usize,
+        target: String,
+        boot_mode: BootMode,
+    },
     Flash {
         path: PathBuf,
         do_chip_erase: bool,
@@ -77,11 +84,15 @@ pub enum WorkerCommand {
     Reset,
     Disconnect,
     Shutdown,
-    ScanFirmware { root: PathBuf },
+    ScanFirmware {
+        root: PathBuf,
+    },
     SetLang(Lang),
     RttStart,
     RttStop,
-    RttWrite { data: Vec<u8> },
+    RttWrite {
+        data: Vec<u8>,
+    },
 }
 
 /// RTT 轮询间隔。
@@ -105,8 +116,14 @@ pub enum WorkerEvent {
         candidates: Vec<FirmwareCandidate>,
         best: Option<usize>,
     },
-    RttData { channel: usize, data: Vec<u8> },
-    RttStarted { up_channels: usize, down_channels: usize },
+    RttData {
+        channel: usize,
+        data: Vec<u8>,
+    },
+    RttStarted {
+        up_channels: usize,
+        down_channels: usize,
+    },
     RttStopped,
 }
 
@@ -163,7 +180,13 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     }
                 },
                 WorkerCommand::ConnectAuto { probe, boot_mode } => {
-                    rtt::stop(&mut rtt, &events, lang, "重新连接前已停止 RTT", "RTT stopped before reconnecting");
+                    rtt::stop(
+                        &mut rtt,
+                        &events,
+                        lang,
+                        "重新连接前已停止 RTT",
+                        "RTT stopped before reconnecting",
+                    );
                     match connect(&probes, probe, None, boot_mode, lang) {
                         Ok((s, summary)) => {
                             session = Some(s);
@@ -179,15 +202,21 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     target,
                     boot_mode,
                 } => {
-                    rtt::stop(&mut rtt, &events, lang, "重新连接前已停止 RTT", "RTT stopped before reconnecting");
+                    rtt::stop(
+                        &mut rtt,
+                        &events,
+                        lang,
+                        "重新连接前已停止 RTT",
+                        "RTT stopped before reconnecting",
+                    );
                     match connect(&probes, probe, Some(target), boot_mode, lang) {
-                    Ok((s, summary)) => {
-                        session = Some(s);
-                        let _ = events.send(WorkerEvent::Connected(Ok(summary)));
-                    }
-                    Err(e) => {
-                        let _ = events.send(WorkerEvent::Connected(Err(e)));
-                    }
+                        Ok((s, summary)) => {
+                            session = Some(s);
+                            let _ = events.send(WorkerEvent::Connected(Ok(summary)));
+                        }
+                        Err(e) => {
+                            let _ = events.send(WorkerEvent::Connected(Err(e)));
+                        }
                     }
                 }
                 WorkerCommand::Flash {
@@ -197,7 +226,13 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     keep_unwritten_bytes,
                     reset_after,
                 } => {
-                    rtt::stop(&mut rtt, &events, lang, "烧录期间已停止 RTT", "RTT stopped during flashing");
+                    rtt::stop(
+                        &mut rtt,
+                        &events,
+                        lang,
+                        "烧录期间已停止 RTT",
+                        "RTT stopped during flashing",
+                    );
                     let result = match &mut session {
                         Some(sess) => flash(
                             sess,
@@ -216,14 +251,23 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     };
                     let result = result.and_then(|()| {
                         if reset_after {
-                            reset(session.as_mut().expect("session must exist after flash"), lang)?;
+                            reset(
+                                session.as_mut().expect("session must exist after flash"),
+                                lang,
+                            )?;
                         }
                         Ok(())
                     });
                     let _ = events.send(WorkerEvent::OperationDone(result));
                 }
                 WorkerCommand::EraseAll => {
-                    rtt::stop(&mut rtt, &events, lang, "擦除期间已停止 RTT", "RTT stopped during erase");
+                    rtt::stop(
+                        &mut rtt,
+                        &events,
+                        lang,
+                        "擦除期间已停止 RTT",
+                        "RTT stopped during erase",
+                    );
                     let result = match &mut session {
                         Some(sess) => erase_flash(sess, &events, lang),
                         None => Err(lang.pick(
@@ -247,10 +291,9 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                 WorkerCommand::Disconnect => {
                     rtt::stop(&mut rtt, &events, lang, "", "");
                     session = None;
-                    let _ = events.send(WorkerEvent::Status(lang.pick(
-                        "已断开连接".to_owned(),
-                        "Disconnected".to_owned(),
-                    )));
+                    let _ = events.send(WorkerEvent::Status(
+                        lang.pick("已断开连接".to_owned(), "Disconnected".to_owned()),
+                    ));
                 }
                 WorkerCommand::ScanFirmware { root } => {
                     let (candidates, best) = scan_firmware(&root);
@@ -288,15 +331,12 @@ fn connect(
     boot_mode: BootMode,
     lang: Lang,
 ) -> Result<(Session, TargetSummary), String> {
-    let info = probes
-        .get(index)
-        .cloned()
-        .ok_or_else(|| {
-            lang.pick(
-                format!("未找到编号为 {index} 的调试探针"),
-                format!("No debug probe with index {index} found"),
-            )
-        })?;
+    let info = probes.get(index).cloned().ok_or_else(|| {
+        lang.pick(
+            format!("未找到编号为 {index} 的调试探针"),
+            format!("No debug probe with index {index} found"),
+        )
+    })?;
 
     let permissions = Permissions::new().allow_erase_all();
 
@@ -468,21 +508,12 @@ fn flash(
         probe_rs::flashing::download_file_with_options(session, path, Uf2Loader, options)
     } else {
         return Err(lang.pick(
-            format!(
-                "不支持的文件格式: .{ext}，请选择 .elf / .hex / .bin / .uf2 文件"
-            ),
-            format!(
-                "Unsupported file format: .{ext}. Choose a .elf / .hex / .bin / .uf2 file"
-            ),
+            format!("不支持的文件格式: .{ext}，请选择 .elf / .hex / .bin / .uf2 文件"),
+            format!("Unsupported file format: .{ext}. Choose a .elf / .hex / .bin / .uf2 file"),
         ));
     };
 
-    result.map_err(|e| {
-        lang.pick(
-            format!("烧录失败: {e}"),
-            format!("Flashing failed: {e}"),
-        )
-    })
+    result.map_err(|e| lang.pick(format!("烧录失败: {e}"), format!("Flashing failed: {e}")))
 }
 
 fn erase_flash(
@@ -505,15 +536,14 @@ fn erase_flash(
 }
 
 fn reset(session: &mut Session, lang: Lang) -> Result<(), String> {
-    let mut core = session
-        .core(0)
-        .map_err(|e| lang.pick(format!("获取核心失败: {e}"), format!("Failed to get core: {e}")))?;
-    core.reset().map_err(|e| {
+    let mut core = session.core(0).map_err(|e| {
         lang.pick(
-            format!("复位失败: {e}"),
-            format!("Reset failed: {e}"),
+            format!("获取核心失败: {e}"),
+            format!("Failed to get core: {e}"),
         )
-    })
+    })?;
+    core.reset()
+        .map_err(|e| lang.pick(format!("复位失败: {e}"), format!("Reset failed: {e}")))
 }
 
 fn map_progress(event: ProgressEvent, lang: Lang) -> Option<WorkerEvent> {
@@ -564,4 +594,3 @@ fn op_label(op: ProgressOperation, lang: Lang) -> &'static str {
         ProgressOperation::Fill => lang.pick("填充", "Fill"),
     }
 }
-

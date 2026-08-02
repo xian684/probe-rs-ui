@@ -6,10 +6,6 @@ It automatically detects debug probes, identifies target chips, supports manual 
 
 > 中文文档见 [README.md](README.md)
 
-## Screenshot
-
-![Screenshot](docs/screenshot.png)
-
 ## Features
 
 - 🔍 **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).
@@ -61,9 +57,13 @@ Every push to `master` builds `.tar.gz` packages for Linux x86_64, macOS Intel, 
 ## Project Structure
 
 ```
+build.rs
+assets/
+  └── icon.ico     Windows app icon
 src/
 ├── main.rs    Entry point, window configuration and icon
-├── app.rs     egui UI, event handling and panel rendering
+├── app.rs     App state, event handling and main loop
+├── app/panels/ egui panel rendering (top / device / rtt_panel / flash)
 ├── worker.rs  Background thread: probe scan, connect, flash, erase, reset
 ├── chips.rs   Built-in chip database enumeration and brand grouping
 ├── firmware.rs Firmware scanning and format detection (ELF/HEX/BIN/UF2)

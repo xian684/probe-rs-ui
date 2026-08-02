@@ -166,13 +166,17 @@ mod tests {
             "expected release myapp.elf, got {first}"
         );
         assert!(
-            cands.iter().all(|c| !c.path.to_string_lossy().contains("deps")),
+            cands
+                .iter()
+                .all(|c| !c.path.to_string_lossy().contains("deps")),
             "deps dir must be skipped"
         );
         assert!(
-            cands
-                .iter()
-                .all(|c| !c.path.to_string_lossy().to_lowercase().contains("\\build\\")),
+            cands.iter().all(|c| !c
+                .path
+                .to_string_lossy()
+                .to_lowercase()
+                .contains("\\build\\")),
             "cargo build dir must be skipped"
         );
         let _ = std::fs::remove_dir_all(&root);
@@ -188,8 +192,15 @@ mod tests {
         let (cands, best) = scan_firmware(&root);
         assert_eq!(best, Some(0));
         let first = cands.first().unwrap().path.to_string_lossy().to_lowercase();
-        assert!(first.contains("release"), "expected release build, got {first}");
-        assert_eq!(cands.len(), 2, "build dir must be scanned outside cargo target");
+        assert!(
+            first.contains("release"),
+            "expected release build, got {first}"
+        );
+        assert_eq!(
+            cands.len(),
+            2,
+            "build dir must be scanned outside cargo target"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -203,7 +214,10 @@ mod tests {
             &root.join("target/thumbv7em-none-eabihf/release/myapp"),
             &bytes,
         );
-        write(&root.join("target/thumbv7em-none-eabihf/debug/myapp"), &bytes);
+        write(
+            &root.join("target/thumbv7em-none-eabihf/debug/myapp"),
+            &bytes,
+        );
         write(&root.join("src/main.rs"), &[]);
 
         let (cands, best) = scan_firmware(&root);
