@@ -96,6 +96,29 @@ pub fn load() -> AppConfig {
 pub fn save(cfg: &AppConfig) {
     let path = config_path();
     if let Ok(text) = toml::to_string(cfg) {
-        let _ = std::fs::write(path, text);
+        if std::fs::write(&path, text).is_ok() {
+            set_hidden(&path);
+        }
     }
 }
+
+/// Windows 下将配置文件标记为隐藏，避免在可执行文件目录中显眼地出现。
+/// 其他平台（Linux/macOS）下为空实现。
+#[cfg(windows)]
+fn set_hidden(path: &std::path::Path) {
+    use std::os::windows::ffi::OsStrExt;
+    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+    extern "system" {
+        fn SetFileAttributesW(lpFileName: *const u16, dwFileAttributes: u32) -> i32;
+    }
+    let wide: Vec<u16> = std::ffi::OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        SetFileAttributesW(wide.as_ptr(), FILE_ATTRIBUTE_HIDDEN);
+    }
+}
+
+#[cfg(not(windows))]
+fn set_hidden(_path: &std::path::Path) {}
