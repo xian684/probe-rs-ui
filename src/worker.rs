@@ -88,6 +88,14 @@ pub enum WorkerCommand {
         start: u64,
         end: u64,
     },
+    MemoryRead {
+        start: u64,
+        len: usize,
+    },
+    MemoryWrite {
+        start: u64,
+        data: Vec<u8>,
+    },
     Reset,
     Disconnect,
     Shutdown,
@@ -132,6 +140,8 @@ pub enum WorkerEvent {
         down_channels: usize,
     },
     RttStopped,
+    MemoryRead(Result<Vec<u8>, String>),
+    MemoryWrite(Result<(), String>),
 }
 
 pub struct Worker {
@@ -304,6 +314,28 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                         )),
                     };
                     let _ = events.send(WorkerEvent::OperationDone(result));
+                }
+                WorkerCommand::MemoryRead { start, len } => {
+                    let result = match &mut session {
+                        Some(sess) => memory_read(sess, start, len, lang),
+                        None => Err(lang.pick(
+                            "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                            "Not connected to a target. Auto-detect or select the target first"
+                                .to_owned(),
+                        )),
+                    };
+                    let _ = events.send(WorkerEvent::MemoryRead(result));
+                }
+                WorkerCommand::MemoryWrite { start, data } => {
+                    let result = match &mut session {
+                        Some(sess) => memory_write(sess, start, &data, lang),
+                        None => Err(lang.pick(
+                            "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                            "Not connected to a target. Auto-detect or select the target first"
+                                .to_owned(),
+                        )),
+                    };
+                    let _ = events.send(WorkerEvent::MemoryWrite(result));
                 }
                 WorkerCommand::Reset => {
                     let result = match &mut session {
@@ -643,6 +675,44 @@ fn read_flash(
         total: None,
         state: OpState::Done,
     });
+    Ok(())
+}
+
+fn memory_read(
+    session: &mut Session,
+    start: u64,
+    len: usize,
+    lang: Lang,
+) -> Result<Vec<u8>, String> {
+    let mut core = session.core(0).map_err(|e| {
+        lang.pick(
+            format!("获取核心失败: {e}"),
+            format!("Failed to get core: {e}"),
+        )
+    })?;
+    let mut buf = vec![0u8; len];
+    core.read_8(start, &mut buf).map_err(|e| {
+        lang.pick(
+            format!("读取内存失败 (0x{start:X}): {e}"),
+            format!("Failed to read memory (0x{start:X}): {e}"),
+        )
+    })?;
+    Ok(buf)
+}
+
+fn memory_write(session: &mut Session, start: u64, data: &[u8], lang: Lang) -> Result<(), String> {
+    let mut core = session.core(0).map_err(|e| {
+        lang.pick(
+            format!("获取核心失败: {e}"),
+            format!("Failed to get core: {e}"),
+        )
+    })?;
+    core.write_8(start, data).map_err(|e| {
+        lang.pick(
+            format!("写入内存失败 (0x{start:X}): {e}"),
+            format!("Failed to write memory (0x{start:X}): {e}"),
+        )
+    })?;
     Ok(())
 }
 

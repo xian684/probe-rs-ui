@@ -2,7 +2,9 @@
 //!
 //! 通过 `ProbeUiApp` 的 `pub(crate)` 接口访问应用状态与事件处理。
 
+mod central;
 mod device;
 mod flash;
+mod mem_panel;
 mod rtt_panel;
 mod top;

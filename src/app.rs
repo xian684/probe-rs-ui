@@ -75,6 +75,15 @@ pub struct ProbeUiApp {
     pub(crate) rtt_buf: String,
     pub(crate) rtt_autoscroll: bool,
     pub(crate) rtt_down_input: String,
+
+    pub(crate) mem_mode: bool,
+    pub(crate) mem_start: u64,
+    pub(crate) mem_len: usize,
+    pub(crate) mem_data: Vec<u8>,
+    pub(crate) mem_read_addr: u64,
+    pub(crate) mem_busy: bool,
+    pub(crate) mem_write_start: u64,
+    pub(crate) mem_write_input: String,
 }
 
 impl ProbeUiApp {
@@ -118,6 +127,14 @@ impl ProbeUiApp {
             rtt_buf: String::new(),
             rtt_autoscroll: true,
             rtt_down_input: String::new(),
+            mem_mode: false,
+            mem_start: 0,
+            mem_len: 256,
+            mem_data: Vec::new(),
+            mem_read_addr: 0,
+            mem_busy: false,
+            mem_write_start: 0,
+            mem_write_input: String::new(),
         };
         app.log(
             app.lang.pick(
@@ -240,6 +257,14 @@ impl ProbeUiApp {
                     self.read_end = flash.end;
                     self.bin_base = flash.start;
                 }
+                if let Some(ram) = self
+                    .connected
+                    .as_ref()
+                    .and_then(|s| s.memory.iter().find(|m| m.kind == "RAM"))
+                {
+                    self.mem_start = ram.start;
+                    self.mem_write_start = ram.start;
+                }
             }
             WorkerEvent::Connected(Err(e)) => {
                 self.connecting = false;
@@ -347,6 +372,27 @@ impl ProbeUiApp {
             WorkerEvent::RttStopped => {
                 self.rtt_on = false;
             }
+            WorkerEvent::MemoryRead(Ok(data)) => {
+                self.mem_busy = false;
+                self.mem_read_addr = self.mem_start;
+                self.mem_data = data;
+                self.log_ok(self.lang.pick(
+                    format!("读取内存完成: {} 字节", self.mem_data.len()),
+                    format!("Memory read: {} bytes", self.mem_data.len()),
+                ));
+            }
+            WorkerEvent::MemoryRead(Err(e)) => {
+                self.mem_busy = false;
+                self.mem_data.clear();
+                self.log_err(e);
+            }
+            WorkerEvent::MemoryWrite(result) => {
+                self.mem_busy = false;
+                match result {
+                    Ok(()) => self.log_ok(self.t("内存写入完成", "Memory written")),
+                    Err(e) => self.log_err(e),
+                }
+            }
         }
     }
 
@@ -392,6 +438,65 @@ impl ProbeUiApp {
             bin_base: self.bin_base,
         });
     }
+
+    pub(crate) fn read_memory(&mut self) {
+        if self.connected.is_none() {
+            self.log_warn(self.t("请先连接目标芯片", "Connect to a target first"));
+            return;
+        }
+        let len = self.mem_len.clamp(1, 256 * 1024);
+        if len != self.mem_len {
+            self.log_warn(self.lang.pick(
+                format!("读取长度已限制为 {len} 字节"),
+                format!("Read length clamped to {len} bytes"),
+            ));
+            self.mem_len = len;
+        }
+        let start = self.mem_start;
+        self.mem_busy = true;
+        self.log_info(self.lang.pick(
+            format!("正在读取内存: 0x{start:X}，{len} 字节"),
+            format!("Reading memory: 0x{start:X}, {len} bytes"),
+        ));
+        self.send(WorkerCommand::MemoryRead { start, len });
+    }
+
+    pub(crate) fn write_memory(&mut self) {
+        let Some(bytes) = parse_hex_bytes(&self.mem_write_input) else {
+            self.log_err(self.t(
+                "数据格式错误：请输入十六进制字节（如 DE AD BE EF）",
+                "Invalid data: enter hex bytes (e.g. DE AD BE EF)",
+            ));
+            return;
+        };
+        if bytes.is_empty() {
+            return;
+        }
+        if self.connected.is_none() {
+            self.log_warn(self.t("请先连接目标芯片", "Connect to a target first"));
+            return;
+        }
+        let start = self.mem_write_start;
+        self.mem_busy = true;
+        self.log_info(self.lang.pick(
+            format!("正在写入内存: 0x{start:X}，{} 字节", bytes.len()),
+            format!("Writing memory: 0x{start:X}, {} bytes", bytes.len()),
+        ));
+        self.send(WorkerCommand::MemoryWrite { start, data: bytes });
+    }
+}
+
+/// 将形如 "DE AD BE EF" 或 "DEADBEEF" 的十六进制字符串解析为字节序列。
+fn parse_hex_bytes(s: &str) -> Option<Vec<u8>> {
+    let compact: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+    if compact.is_empty() || compact.len() % 2 != 0 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(compact.len() / 2);
+    for i in (0..compact.len()).step_by(2) {
+        out.push(u8::from_str_radix(&compact[i..i + 2], 16).ok()?);
+    }
+    Some(out)
 }
 
 impl Drop for ProbeUiApp {
@@ -406,13 +511,13 @@ impl eframe::App for ProbeUiApp {
             self.handle_event(ev);
         }
 
-        if self.probing || self.connecting || self.busy || self.rtt_on {
+        if self.probing || self.connecting || self.busy || self.rtt_on || self.mem_busy {
             ctx.request_repaint_after(Duration::from_millis(40));
         }
 
         self.top_panel(ctx);
         self.device_panel(ctx);
         self.rtt_panel(ctx);
-        self.flashing_panel(ctx);
+        self.central_panel(ctx);
     }
 }
