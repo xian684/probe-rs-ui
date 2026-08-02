@@ -63,7 +63,7 @@ assets/
 src/
 ├── main.rs    Entry point, window configuration and icon
 ├── app.rs     App state, event handling and main loop
-├── app/panels/ egui panel rendering (top / device / rtt_panel / flash)
+├── panels/    egui panel rendering (top / device / rtt_panel / flash)
 ├── worker.rs  Background thread: probe scan, connect, flash, erase, reset
 ├── chips.rs   Built-in chip database enumeration and brand grouping
 ├── firmware.rs Firmware scanning and format detection (ELF/HEX/BIN/UF2)

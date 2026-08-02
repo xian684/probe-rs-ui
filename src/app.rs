@@ -11,68 +11,66 @@ use crate::worker::{
     self, BootMode, OpState, ProbeInfo, TargetSummary, WorkerCommand, WorkerEvent,
 };
 
-mod panels;
-
 #[derive(Clone, Copy)]
-enum LogLevel {
+pub(crate) enum LogLevel {
     Info,
     Ok,
     Warn,
     Error,
 }
 
-struct LogEntry {
-    text: String,
-    level: LogLevel,
+pub(crate) struct LogEntry {
+    pub(crate) text: String,
+    pub(crate) level: LogLevel,
 }
 
-struct OpBar {
-    label: String,
-    done: u64,
-    total: Option<u64>,
-    state: OpState,
+pub(crate) struct OpBar {
+    pub(crate) label: String,
+    pub(crate) done: u64,
+    pub(crate) total: Option<u64>,
+    pub(crate) state: OpState,
 }
 
 pub struct ProbeUiApp {
-    to_worker: Sender<WorkerCommand>,
-    from_worker: Receiver<WorkerEvent>,
+    pub(crate) to_worker: Sender<WorkerCommand>,
+    pub(crate) from_worker: Receiver<WorkerEvent>,
 
-    lang: Lang,
+    pub(crate) lang: Lang,
 
-    probes: Vec<ProbeInfo>,
-    selected_probe: usize,
-    probing: bool,
-    connecting: bool,
-    boot_mode: BootMode,
+    pub(crate) probes: Vec<ProbeInfo>,
+    pub(crate) selected_probe: usize,
+    pub(crate) probing: bool,
+    pub(crate) connecting: bool,
+    pub(crate) boot_mode: BootMode,
 
-    connected: Option<TargetSummary>,
-    manual_target: String,
-    chip_families: Vec<ChipFamilyInfo>,
-    chip_brands: Vec<ChipBrandInfo>,
-    selected_brand: Option<usize>,
-    selected_family: Option<usize>,
-    chip_search: String,
-    show_manual: bool,
+    pub(crate) connected: Option<TargetSummary>,
+    pub(crate) manual_target: String,
+    pub(crate) chip_families: Vec<ChipFamilyInfo>,
+    pub(crate) chip_brands: Vec<ChipBrandInfo>,
+    pub(crate) selected_brand: Option<usize>,
+    pub(crate) selected_family: Option<usize>,
+    pub(crate) chip_search: String,
+    pub(crate) show_manual: bool,
 
-    file_path: String,
-    chip_erase: bool,
-    verify: bool,
-    keep_unwritten: bool,
-    reset_after: bool,
+    pub(crate) file_path: String,
+    pub(crate) chip_erase: bool,
+    pub(crate) verify: bool,
+    pub(crate) keep_unwritten: bool,
+    pub(crate) reset_after: bool,
 
-    firmware_root: String,
-    firmware_candidates: Vec<FirmwareCandidate>,
-    firmware_scanning: bool,
+    pub(crate) firmware_root: String,
+    pub(crate) firmware_candidates: Vec<FirmwareCandidate>,
+    pub(crate) firmware_scanning: bool,
 
-    busy: bool,
-    op_bars: Vec<OpBar>,
-    log: Vec<LogEntry>,
+    pub(crate) busy: bool,
+    pub(crate) op_bars: Vec<OpBar>,
+    pub(crate) log: Vec<LogEntry>,
 
-    rtt_on: bool,
-    rtt_enabled: bool,
-    rtt_buf: String,
-    rtt_autoscroll: bool,
-    rtt_down_input: String,
+    pub(crate) rtt_on: bool,
+    pub(crate) rtt_enabled: bool,
+    pub(crate) rtt_buf: String,
+    pub(crate) rtt_autoscroll: bool,
+    pub(crate) rtt_down_input: String,
 }
 
 impl ProbeUiApp {
@@ -138,21 +136,21 @@ impl ProbeUiApp {
         app
     }
 
-    fn send(&self, cmd: WorkerCommand) {
+    pub(crate) fn send(&self, cmd: WorkerCommand) {
         let _ = self.to_worker.send(cmd);
     }
 
-    fn t(&self, zh: &'static str, en: &'static str) -> &'static str {
+    pub(crate) fn t(&self, zh: &'static str, en: &'static str) -> &'static str {
         self.lang.pick(zh, en)
     }
 
     /// 图标 + 本地化文本。
-    fn icon(&self, emoji: &str, zh: &'static str, en: &'static str) -> String {
+    pub(crate) fn icon(&self, emoji: &str, zh: &'static str, en: &'static str) -> String {
         format!("{emoji} {}", self.t(zh, en))
     }
 
     /// 品牌名本地化（其余品牌名为专有名词，直接显示）。
-    fn brand_label(&self, brand: &str) -> String {
+    pub(crate) fn brand_label(&self, brand: &str) -> String {
         match brand {
             "Other" => self.t("其他", "Other").to_owned(),
             "ARM" => self.t("ARM 通用", "ARM Generic").to_owned(),
@@ -161,14 +159,14 @@ impl ProbeUiApp {
         }
     }
 
-    fn set_lang(&mut self, lang: Lang) {
+    pub(crate) fn set_lang(&mut self, lang: Lang) {
         if self.lang != lang {
             self.lang = lang;
             self.send(WorkerCommand::SetLang(lang));
         }
     }
 
-    fn log(&mut self, text: impl Into<String>, level: LogLevel) {
+    pub(crate) fn log(&mut self, text: impl Into<String>, level: LogLevel) {
         self.log.push(LogEntry {
             text: text.into(),
             level,
@@ -178,19 +176,19 @@ impl ProbeUiApp {
         }
     }
 
-    fn log_info(&mut self, text: impl Into<String>) {
+    pub(crate) fn log_info(&mut self, text: impl Into<String>) {
         self.log(text, LogLevel::Info);
     }
 
-    fn log_ok(&mut self, text: impl Into<String>) {
+    pub(crate) fn log_ok(&mut self, text: impl Into<String>) {
         self.log(text, LogLevel::Ok);
     }
 
-    fn log_warn(&mut self, text: impl Into<String>) {
+    pub(crate) fn log_warn(&mut self, text: impl Into<String>) {
         self.log(text, LogLevel::Warn);
     }
 
-    fn log_err(&mut self, text: impl Into<String>) {
+    pub(crate) fn log_err(&mut self, text: impl Into<String>) {
         self.log(text, LogLevel::Error);
     }
 
@@ -336,7 +334,7 @@ impl ProbeUiApp {
         }
     }
 
-    fn detected_format(&self) -> Option<&'static str> {
+    pub(crate) fn detected_format(&self) -> Option<&'static str> {
         let path = std::path::Path::new(&self.file_path);
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             match ext.to_lowercase().as_str() {
@@ -355,7 +353,7 @@ impl ProbeUiApp {
         }
     }
 
-    fn start_flash(&mut self) {
+    pub(crate) fn start_flash(&mut self) {
         if self.detected_format().is_none() {
             self.log_err(self.t(
                 "不支持的文件格式，请选择 .elf / .hex / .bin / .uf2 文件",

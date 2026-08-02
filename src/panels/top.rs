@@ -2,9 +2,8 @@
 
 use eframe::egui;
 
+use crate::app::ProbeUiApp;
 use crate::i18n::Lang;
-
-use super::super::ProbeUiApp;
 
 impl ProbeUiApp {
     /// 顶栏：标题、连接状态与语言切换。

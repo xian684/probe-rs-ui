@@ -2,9 +2,8 @@
 
 use eframe::egui;
 
+use crate::app::ProbeUiApp;
 use crate::worker::WorkerCommand;
-
-use super::super::ProbeUiApp;
 
 impl ProbeUiApp {
     /// 底部 RTT 日志面板。

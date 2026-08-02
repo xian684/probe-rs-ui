@@ -2,9 +2,8 @@
 
 use eframe::egui;
 
+use crate::app::ProbeUiApp;
 use crate::worker::{BootMode, WorkerCommand};
-
-use super::super::ProbeUiApp;
 
 impl ProbeUiApp {
     /// 左侧设备检测面板（探针选择、自动识别、手动指定目标、目标信息）。

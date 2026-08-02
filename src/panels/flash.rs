@@ -2,9 +2,8 @@
 
 use eframe::egui;
 
+use crate::app::{LogLevel, ProbeUiApp};
 use crate::worker::{OpState, WorkerCommand};
-
-use super::super::{LogLevel, ProbeUiApp};
 
 impl ProbeUiApp {
     /// 中央固件烧录面板：文件选择、烧录选项、操作按钮、进度与日志。

@@ -5,6 +5,7 @@ mod chips;
 mod firmware;
 mod fonts;
 mod i18n;
+mod panels;
 mod rtt;
 mod worker;
 
