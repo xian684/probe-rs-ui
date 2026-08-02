@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -13,7 +14,7 @@ use probe_rs::flashing::{
     HexLoader, ProgressEvent, ProgressOperation, Uf2Loader,
 };
 use probe_rs::probe::{list::Lister, DebugProbeInfo};
-use probe_rs::{Permissions, Session};
+use probe_rs::{MemoryInterface, Permissions, Session};
 
 use crate::rtt;
 
@@ -79,8 +80,14 @@ pub enum WorkerCommand {
         verify: bool,
         keep_unwritten_bytes: bool,
         reset_after: bool,
+        bin_base: u64,
     },
     EraseAll,
+    ReadFlash {
+        path: PathBuf,
+        start: u64,
+        end: u64,
+    },
     Reset,
     Disconnect,
     Shutdown,
@@ -225,6 +232,7 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     verify,
                     keep_unwritten_bytes,
                     reset_after,
+                    bin_base,
                 } => {
                     rtt::stop(
                         &mut rtt,
@@ -240,6 +248,7 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                             do_chip_erase,
                             verify,
                             keep_unwritten_bytes,
+                            bin_base,
                             &events,
                             lang,
                         ),
@@ -270,6 +279,24 @@ fn run(rx: mpsc::Receiver<WorkerCommand>, events: mpsc::Sender<WorkerEvent>, mut
                     );
                     let result = match &mut session {
                         Some(sess) => erase_flash(sess, &events, lang),
+                        None => Err(lang.pick(
+                            "尚未连接到目标芯片，请先自动识别目标".to_owned(),
+                            "Not connected to a target. Auto-detect or select the target first"
+                                .to_owned(),
+                        )),
+                    };
+                    let _ = events.send(WorkerEvent::OperationDone(result));
+                }
+                WorkerCommand::ReadFlash { path, start, end } => {
+                    rtt::stop(
+                        &mut rtt,
+                        &events,
+                        lang,
+                        "读取期间已停止 RTT",
+                        "RTT stopped during read",
+                    );
+                    let result = match &mut session {
+                        Some(sess) => read_flash(sess, &path, start, end, &events, lang),
                         None => Err(lang.pick(
                             "尚未连接到目标芯片，请先自动识别目标".to_owned(),
                             "Not connected to a target. Auto-detect or select the target first"
@@ -464,6 +491,7 @@ fn flash(
     do_chip_erase: bool,
     verify: bool,
     keep_unwritten_bytes: bool,
+    bin_base: u64,
     events: &mpsc::Sender<WorkerEvent>,
     lang: Lang,
 ) -> Result<(), String> {
@@ -501,7 +529,10 @@ fn flash(
         probe_rs::flashing::download_file_with_options(
             session,
             path,
-            BinLoader(BinOptions::default()),
+            BinLoader(BinOptions {
+                base_address: Some(bin_base),
+                ..Default::default()
+            }),
             options,
         )
     } else if ext == "uf2" {
@@ -533,6 +564,86 @@ fn erase_flash(
             format!("Chip erase failed: {e}"),
         )
     })
+}
+
+fn read_flash(
+    session: &mut Session,
+    path: &Path,
+    start: u64,
+    end: u64,
+    events: &mpsc::Sender<WorkerEvent>,
+    lang: Lang,
+) -> Result<(), String> {
+    const CHUNK: usize = 4096;
+
+    let total = end.saturating_sub(start);
+    let mut file = std::fs::File::create(path).map_err(|e| {
+        lang.pick(
+            format!("创建文件失败: {e}"),
+            format!("Failed to create file: {e}"),
+        )
+    })?;
+
+    let _ = events.send(WorkerEvent::Status(lang.pick(
+        format!(
+            "开始读取固件: 0x{start:X} - 0x{end:X}（{} KB）",
+            total / 1024
+        ),
+        format!(
+            "Reading firmware: 0x{start:X} - 0x{end:X} ({} KB)",
+            total / 1024
+        ),
+    )));
+
+    let events2 = events.clone();
+    let op = lang.pick("读取", "Read");
+    let _ = events2.send(WorkerEvent::Progress {
+        operation: op,
+        done: 0,
+        total: Some(total),
+        state: OpState::Active,
+    });
+
+    let mut addr = start;
+    let mut remaining = total;
+    let mut core = session.core(0).map_err(|e| {
+        lang.pick(
+            format!("获取核心失败: {e}"),
+            format!("Failed to get core: {e}"),
+        )
+    })?;
+    while remaining > 0 {
+        let n = remaining.min(CHUNK as u64) as usize;
+        let mut buf = vec![0u8; n];
+        core.read_8(addr, &mut buf).map_err(|e| {
+            lang.pick(
+                format!("读取 Flash 失败 (0x{addr:X}): {e}"),
+                format!("Failed to read flash (0x{addr:X}): {e}"),
+            )
+        })?;
+        file.write_all(&buf).map_err(|e| {
+            lang.pick(
+                format!("写入文件失败: {e}"),
+                format!("Failed to write file: {e}"),
+            )
+        })?;
+        addr += n as u64;
+        remaining -= n as u64;
+        let _ = events2.send(WorkerEvent::Progress {
+            operation: op,
+            done: n as u64,
+            total: Some(total),
+            state: OpState::Active,
+        });
+    }
+
+    let _ = events2.send(WorkerEvent::Progress {
+        operation: op,
+        done: 0,
+        total: None,
+        state: OpState::Done,
+    });
+    Ok(())
 }
 
 fn reset(session: &mut Session, lang: Lang) -> Result<(), String> {

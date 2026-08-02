@@ -63,6 +63,16 @@ impl ProbeUiApp {
                     format!("文件格式: {}", fmt),
                     format!("File format: {}", fmt),
                 ));
+                if fmt == "Binary" {
+                    ui.horizontal(|ui| {
+                        ui.label(self.t("基地址:", "Base address:"));
+                        ui.add(
+                            egui::DragValue::new(&mut self.bin_base)
+                                .hexadecimal(8, false, true)
+                                .prefix("0x"),
+                        );
+                    });
+                }
             }
 
             if self.firmware_scanning {
@@ -184,6 +194,65 @@ impl ProbeUiApp {
                     self.send(WorkerCommand::Reset);
                 }
             });
+
+            ui.add_space(8.0);
+            ui.separator();
+            ui.heading(self.t("读取固件", "Read Firmware"));
+            ui.horizontal(|ui| {
+                ui.label(self.t("范围:", "Range:"));
+                ui.add(
+                    egui::DragValue::new(&mut self.read_start)
+                        .hexadecimal(8, false, true)
+                        .prefix("0x"),
+                );
+                ui.label("-");
+                ui.add(
+                    egui::DragValue::new(&mut self.read_end)
+                        .hexadecimal(8, false, true)
+                        .prefix("0x"),
+                );
+                ui.label(self.t("字节", "bytes"));
+            });
+            if self.read_end > self.read_start {
+                let size = self.read_end - self.read_start;
+                ui.label(
+                    egui::RichText::new(self.lang.pick(
+                        format!("大小: {} KB", size / 1024),
+                        format!("Size: {} KB", size / 1024),
+                    ))
+                    .small()
+                    .weak(),
+                );
+            }
+            let can_read = self.connected.is_some()
+                && self.read_end > self.read_start
+                && !self.busy
+                && !self.connecting
+                && !self.probing;
+            if ui
+                .add_enabled(
+                    can_read,
+                    egui::Button::new(self.icon("💾", "读取固件...", "Read Firmware..."))
+                        .fill(egui::Color32::from_rgb(0x8a, 0x6d, 0x3b)),
+                )
+                .clicked()
+            {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("BIN", &["bin"])
+                    .set_file_name("firmware.bin")
+                    .save_file()
+                {
+                    let start = self.read_start;
+                    let end = self.read_end;
+                    self.busy = true;
+                    self.op_bars.clear();
+                    self.log_info(self.lang.pick(
+                        format!("开始读取: 0x{start:X} - 0x{end:X}"),
+                        format!("Starting read: 0x{start:X} - 0x{end:X}"),
+                    ));
+                    self.send(WorkerCommand::ReadFlash { path, start, end });
+                }
+            }
 
             ui.add_space(10.0);
             if !self.op_bars.is_empty() {

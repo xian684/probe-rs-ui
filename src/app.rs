@@ -62,6 +62,10 @@ pub struct ProbeUiApp {
     pub(crate) firmware_candidates: Vec<FirmwareCandidate>,
     pub(crate) firmware_scanning: bool,
 
+    pub(crate) read_start: u64,
+    pub(crate) read_end: u64,
+    pub(crate) bin_base: u64,
+
     pub(crate) busy: bool,
     pub(crate) op_bars: Vec<OpBar>,
     pub(crate) log: Vec<LogEntry>,
@@ -103,6 +107,9 @@ impl ProbeUiApp {
             firmware_root: String::new(),
             firmware_candidates: Vec::new(),
             firmware_scanning: false,
+            read_start: 0,
+            read_end: 0,
+            bin_base: 0,
             busy: false,
             op_bars: Vec::new(),
             log: Vec::new(),
@@ -224,6 +231,15 @@ impl ProbeUiApp {
                     format!("Connected to target: {}", summary.name),
                 ));
                 self.connected = Some(summary);
+                if let Some(flash) = self
+                    .connected
+                    .as_ref()
+                    .and_then(|s| s.memory.iter().find(|m| m.kind == "FLASH"))
+                {
+                    self.read_start = flash.start;
+                    self.read_end = flash.end;
+                    self.bin_base = flash.start;
+                }
             }
             WorkerEvent::Connected(Err(e)) => {
                 self.connecting = false;
@@ -373,6 +389,7 @@ impl ProbeUiApp {
             verify: self.verify,
             keep_unwritten_bytes: self.keep_unwritten,
             reset_after: self.reset_after,
+            bin_base: self.bin_base,
         });
     }
 }

@@ -16,6 +16,7 @@ It automatically detects debug probes, identifies target chips, supports manual 
 - ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`, including extensionless Rust ELF build artifacts.
 - ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
 - 🗑️ **Chip erase / target reset**: One-click operations.
+- 💾 **Read firmware**: Read flash over an address range and export it as `.bin` (auto-filled with the chip's flash region on connect).
 - 📊 **Progress display**: Real-time progress bars for erase, program, and verify; operations with an unknown total size (e.g. chip erase) show a spinner.
 - 📡 **RTT log monitor**: Disabled by default; once enabled, a bottom panel streams target RTT up-channel output in real time (channels are auto-labeled), and can send data to the target's down channel 0 via Enter or a button.
 - 🌐 **Bilingual UI**: Automatically loads an available CJK system font on Windows, macOS, or Linux; switch between 中文 and English from the top bar.
