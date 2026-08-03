@@ -56,10 +56,10 @@ impl ProbeUiApp {
         });
 
         ui.add_space(4.0);
+        let l_only = self.t(Msg::TgOnlySupported);
+        ui.checkbox(&mut self.tg_only_supported, l_only);
+        let can_generate = !self.tg_busy && !self.tg_input.trim().is_empty();
         ui.horizontal(|ui| {
-            let l_only = self.t(Msg::TgOnlySupported);
-            ui.checkbox(&mut self.tg_only_supported, l_only);
-            let can_generate = !self.tg_busy && !self.tg_input.trim().is_empty();
             if ui
                 .add_enabled(
                     can_generate,
@@ -70,10 +70,9 @@ impl ProbeUiApp {
             {
                 self.start_target_gen(false);
             }
-            let can_import = can_generate;
             if ui
                 .add_enabled(
-                    can_import,
+                    can_generate,
                     egui::Button::new(self.icon("📥", Msg::TgGenerateImport)),
                 )
                 .clicked()
