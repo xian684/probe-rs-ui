@@ -49,8 +49,9 @@ impl ProbeUiApp {
                     self.log_info(t!(self.lang, Msg::GeneratingFromPack, path.display()));
                     self.send(WorkerCommand::GeneratePack { path });
                 }
-            // 内置芯片包 / 外部芯片包 切换。
-            ui.separator();
+        });
+        // 内置芯片包 / 外部芯片包 切换：独立一行，两个按钮始终并排不折行。
+        ui.horizontal(|ui| {
             let l_builtin = self.icon("🏢", Msg::PackBuiltin);
             let l_external = self.icon("📦", Msg::PackExternal);
             ui.selectable_value(&mut self.pack_tab, PackTab::Builtin, l_builtin);
