@@ -149,7 +149,7 @@ impl ProbeUiApp {
         ui.add_space(4.0);
         // 手动指定目标 / 高级芯片配置：互斥切换的两个子面板。
         ui.horizontal(|ui| {
-            let l_manual = self.icon("🧩", Msg::ManualTargetSel);
+            let l_manual = self.icon("🏢", Msg::ManualTargetSel);
             let l_adv = self.icon("📦", Msg::AdvancedChipConfig);
             ui.selectable_value(&mut self.device_tab, DeviceTab::Manual, l_manual);
             ui.selectable_value(&mut self.device_tab, DeviceTab::Advanced, l_adv);

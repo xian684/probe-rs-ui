@@ -127,7 +127,7 @@ impl ProbeUiApp {
                 if ui
                     .add_enabled(
                         can_act,
-                        egui::Button::new(self.icon("⬇", Msg::ArmDownloadBtn)),
+                        egui::Button::new(self.icon("📥", Msg::ArmDownloadBtn)),
                     )
                     .clicked()
                 {
@@ -142,7 +142,7 @@ impl ProbeUiApp {
                 if ui
                     .add_enabled(
                         can_act,
-                        egui::Button::new(self.icon("➕", Msg::ArmGenerateImportBtn)),
+                        egui::Button::new(self.icon("📋", Msg::ArmGenerateImportBtn)),
                     )
                     .clicked()
                 {
@@ -160,7 +160,7 @@ impl ProbeUiApp {
                 if ui
                     .add_enabled(
                         can_act,
-                        egui::Button::new(self.icon("⚙️", Msg::ArmGenerateBtn))
+                        egui::Button::new(self.icon("🔧", Msg::ArmGenerateBtn))
                             .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43)),
                     )
                     .clicked()
