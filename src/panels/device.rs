@@ -168,12 +168,13 @@ impl ProbeUiApp {
                 .small()
                 .weak(),
         );
-        ui.horizontal(|ui| {
+        // horizontal_wrapped：面板宽度不足时按钮自动折行，避免被搜索框挤出面板。
+        ui.horizontal_wrapped(|ui| {
             ui.label(self.t(Msg::SearchModel));
             let hint = self.t(Msg::SearchHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.chip_search)
-                    .desired_width(f32::INFINITY)
+                    .desired_width(150.0)
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
@@ -425,12 +426,13 @@ impl ProbeUiApp {
         );
 
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
+        // horizontal_wrapped：宽度不足时浏览按钮自动折行，避免被输入框挤出面板。
+        ui.horizontal_wrapped(|ui| {
             ui.label(self.t(Msg::TgInput));
             let hint = self.t(Msg::TgInputHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.tg_input)
-                    .desired_width(f32::INFINITY)
+                    .desired_width(230.0)
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
@@ -448,12 +450,12 @@ impl ProbeUiApp {
         });
 
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(self.t(Msg::TgOutputDir));
             let hint = self.t(Msg::TgOutputDirHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.tg_output_dir)
-                    .desired_width(f32::INFINITY)
+                    .desired_width(230.0)
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
