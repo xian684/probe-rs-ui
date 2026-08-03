@@ -23,7 +23,6 @@ It automatically detects debug probes, identifies target chips, supports manual 
 - 📊 **Progress display**: Real-time progress bars for erase, program, and verify; operations with an unknown total size (e.g. chip erase) show a spinner.
 - 📡 **RTT log monitor**: Disabled by default; once enabled, a bottom panel streams target RTT up-channel output in real time (channels are auto-labeled), and can send data to the target's down channel 0 via Enter or a button.
 - 🌐 **Bilingual UI**: Automatically loads an available CJK system font on Windows, macOS, or Linux; switch between 中文 and English from the top bar.
-- 🖼️ **Icons**: Buttons have icons and the window uses a chip-style icon.
 
 ## Requirements
 
@@ -67,49 +66,20 @@ Every push to `master` builds a `probe-rs-ui-windows-x86_64.zip` with GitHub Act
 
 ```
 probe-rs-ui/
-├── build.rs                 Build script: Windows resource embedding (icon, version info)
-├── assets/
-│   └── icon.ico             Windows app icon
+├── build.rs         Windows resource script (version info)
 └── src/
-    ├── main.rs              Entry point: window config, icon generation, font setup, eframe launch
-    │
-    ├── app/                 App state hub (ProbeUiApp, owned by the UI thread)
-    │   ├── mod.rs           State struct, new(), log helpers, eframe::App main loop (update)
-    │   ├── settings.rs      Config persistence: apply_config / collect_config (config.toml)
-    │   ├── events.rs        Event dispatch: handle_event applies WorkerEvent to UI state
-    │   └── actions.rs       Actions: flashing / memory R/W / format detection (parse_hex_bytes)
-    │
-    ├── panels/              egui panel rendering (all methods on ProbeUiApp)
-    │   ├── mod.rs           Panel module declarations
-    │   ├── top.rs           Top bar: title, connection status, theme / language switchers
-    │   ├── device/          Left device-detection panel
-    │   │   ├── mod.rs       Entry: probe picker, connection mode, auto-detect, sub-panel tabs
-    │   │   ├── manual.rs    Manual target: built-in / external pack switch, search + cascade + connect
-    │   │   ├── target_gen.rs Advanced chip config: CMSIS Pack → chip descriptions (generate / generate & import)
-    │   │   └── info.rs      Target info box: chip & memory map after connect
-    │   ├── central.rs       Central panel: flash / memory viewer / RTT / ARM index tabs
-    │   ├── arm_panel.rs     ARM online index view: search Keil.pidx, download & generate
-    │   ├── flash.rs         Flashing view: file picker, options, progress, read firmware
-    │   ├── mem_panel.rs     Memory viewer: arbitrary-address R/W with hex dump
-    │   ├── rtt_panel.rs     RTT log view: channel select, send/receive, auto-scroll
-    │   └── log.rs           Bottom log panel: global operation log
-    │
-    ├── worker/              Background thread (probe-rs Session lives only here; UI never blocks)
-    │   ├── mod.rs           Public types (WorkerCommand/WorkerEvent) and spawn entry
-    │   ├── run.rs           Thread main loop: command dispatch, RTT polling, connect reply
-    │   ├── probe.rs         Probe scan, target attach (auto/manual/under-reset), reset
-    │   ├── flash.rs         Flash, chip erase, read flash to bin
-    │   ├── memory.rs        Memory read/write
-    │   ├── progress.rs      Flash progress callback → WorkerEvent progress mapping
-    │   └── target_gen.rs    target-gen integration: CMSIS Pack → families → YAML/registry
-    │
-    ├── chips.rs             Built-in chip database enumeration and brand grouping (BRAND_RULES)
-    ├── config.rs            Portable config.toml persistence (next to the exe, hidden attribute)
-    ├── firmware.rs          Firmware scanning and format detection (ELF/HEX/BIN/UF2, ELF magic)
-    ├── rtt.rs               RTT session lifecycle and channel I/O (called by worker)
-    ├── fonts.rs             CJK font loading (candidate paths for Windows/macOS/Linux)
-    └── i18n.rs              Language support: Msg enum + MSGS table + placeholder fill (中文/English)
+    ├── main.rs      Entry point: window config, font setup, eframe launch
+    ├── app/         App state hub: state/entry, config persistence, event dispatch, flash & memory actions
+    ├── panels/      UI panels: top bar, device detection (manual target / advanced chip config), central (flash / memory / RTT / ARM index) and more
+    ├── worker/      Background thread: command dispatch, probe connect, flashing, memory R/W, CMSIS Pack, ARM online index
+    ├── chips.rs     Built-in chip database & brand grouping
+    ├── config.rs    config.toml persistence
+    ├── firmware.rs  Firmware scan & format detection
+    ├── rtt.rs       RTT session & channel I/O
+    ├── fonts.rs     CJK font loading
+    └── i18n.rs      Language support (中文/English)
 ```
+
 
 **UI / backend communication model**: the UI thread (`app`/`panels`) and the background thread (`worker`) are decoupled through two mpsc channels — `WorkerCommand` sends operations down, `WorkerEvent` reports results up. The probe-rs `Session` lives only in the worker thread, so time-consuming flashing/erasing/RW never blocks the UI.
 
