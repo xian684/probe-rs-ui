@@ -20,13 +20,12 @@ impl ProbeUiApp {
         );
 
         ui.add_space(4.0);
-        // horizontal_wrapped：宽度不足时浏览按钮自动折行，避免被输入框挤出面板。
-        ui.horizontal_wrapped(|ui| {
+        ui.horizontal(|ui| {
             ui.label(self.t(Msg::TgInput));
             let hint = self.t(Msg::TgInputHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.tg_input)
-                    .desired_width(230.0)
+                    .desired_width(f32::INFINITY)
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
@@ -36,10 +35,6 @@ impl ProbeUiApp {
                     .pick_file()
                 {
                     self.tg_input = path.display().to_string();
-                }
-            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked()
-                && let Some(dir) = rfd::FileDialog::new().pick_folder() {
-                    self.tg_input = dir.display().to_string();
                 }
         });
 

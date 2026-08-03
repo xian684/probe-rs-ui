@@ -365,14 +365,14 @@ const MSGS: &[(Msg, &str, &str)] = &[
     (Msg::AdvancedChipConfig, "高级芯片配置", "Advanced Chip Config"),
     (
         Msg::AdvancedChipConfigHint,
-        "加载本地 CMSIS Pack（.pack / .pdsc / .zip 或解压目录），自动生成芯片描述，可直接生成后连接目标",
-        "Load a local CMSIS Pack (.pack / .pdsc / .zip or unzipped dir), auto-generate chip descriptions, and optionally connect to the target",
+        "加载本地 CMSIS Pack（.pack / .pdsc / .zip），自动生成芯片描述并纳入手动选型列表",
+        "Load a local CMSIS Pack (.pack / .pdsc / .zip), auto-generate chip descriptions into the manual selection list",
     ),
     (Msg::TgInput, "输入:", "Input:"),
     (
         Msg::TgInputHint,
-        "选择 .pack / .pdsc / .zip 文件，或包含 .pdsc 的解压目录",
-        "Pick a .pack / .pdsc / .zip file, or an unzipped directory containing .pdsc",
+        "选择 .pack / .pdsc / .zip 文件",
+        "Pick a .pack / .pdsc / .zip file",
     ),
     (Msg::TgBrowseFile, "文件...", "File..."),
     (Msg::TgBrowseDir, "目录...", "Dir..."),
