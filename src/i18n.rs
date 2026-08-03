@@ -523,11 +523,15 @@ const MSGS: &[(Msg, &str, &str)] = &[
     ),
     (Msg::ArmSearchBtn, "搜索", "Search"),
     (Msg::ArmDownloadBtn, "下载", "Download"),
-    (Msg::ArmGenerateBtn, "下载并生成", "Download & Generate"),
+    (
+        Msg::ArmGenerateBtn,
+        "下载并生成芯片描述文件",
+        "Download & Generate Chip File",
+    ),
     (
         Msg::ArmGenerateImportBtn,
-        "下载并添加",
-        "Download & Add",
+        "下载并添加到外部芯片包",
+        "Download & Add to External Packs",
     ),
     (
         Msg::ArmNoResult,
