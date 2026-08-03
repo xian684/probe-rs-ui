@@ -368,7 +368,7 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "加载本地 CMSIS Pack（.pack / .pdsc / .zip），自动生成芯片描述并纳入手动选型列表",
         "Load a local CMSIS Pack (.pack / .pdsc / .zip), auto-generate chip descriptions into the manual selection list",
     ),
-    (Msg::TgInput, "输入:", "Input:"),
+    (Msg::TgInput, "输入文件:", "Input file:"),
     (
         Msg::TgInputHint,
         "选择 .pack / .pdsc / .zip 文件",
