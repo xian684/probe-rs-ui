@@ -1,19 +1,30 @@
-//! 中央固件烧录面板：文件选择、烧录选项、操作按钮、进度与日志。
+//! 中央固件烧录面板：文件选择、烧录选项、操作按钮与读取固件区。
+//!
+//! 按区块拆分为 `firmware_file_ui` / `flash_options_ui` / `read_firmware_ui`，
+//! 进度条渲染见 [`crate::panels::flash_progress`]。
 
 use eframe::egui;
 
 use crate::app::ProbeUiApp;
 use crate::i18n::Msg;
 use crate::t;
-use crate::worker::{OpState, WorkerCommand};
+use crate::worker::WorkerCommand;
 
 impl ProbeUiApp {
-    /// 中央固件烧录面板：文件选择、烧录选项、操作按钮、进度与日志。
+    /// 中央固件烧录面板：按区块组织渲染。
     pub(crate) fn flash_view_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.heading(self.t(Msg::FirmwareFlashing));
         ui.separator();
 
+        self.firmware_file_ui(ui);
+        self.flash_options_ui(ui);
+        self.read_firmware_ui(ui);
+        self.op_progress_ui(ui);
+    }
+
+    /// 固件文件选择行、格式识别与项目扫描候选下拉。
+    fn firmware_file_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(self.t(Msg::FirmwareFile));
             let hint = self.t(Msg::FirmwareHint);
@@ -110,7 +121,10 @@ impl ProbeUiApp {
                     self.log_info(t!(self.lang, Msg::SelectedFirmware, self.file_path));
                 }
         }
+    }
 
+    /// 烧录选项（整片擦除 / 校验 / 保留未写字节 / 复位运行）与操作按钮。
+    fn flash_options_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(8.0);
         let l_erase = self.t(Msg::ChipEraseBeforeFlash);
         let l_verify = self.t(Msg::VerifyAfterFlash);
@@ -167,7 +181,10 @@ impl ProbeUiApp {
                 self.send(WorkerCommand::Reset);
             }
         });
+    }
 
+    /// 读取固件区：范围选择与读取按钮。
+    fn read_firmware_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(8.0);
         ui.separator();
         ui.heading(self.t(Msg::ReadFirmwareTitle));
@@ -218,35 +235,5 @@ impl ProbeUiApp {
                 self.log_info(t!(self.lang, Msg::StartingRead, start, end));
                 self.send(WorkerCommand::ReadFlash { path, start, end });
             }
-
-        ui.add_space(10.0);
-        if !self.op_bars.is_empty() {
-            for bar in &self.op_bars {
-                let color = match bar.state {
-                    OpState::Done => egui::Color32::from_rgb(0x2e, 0xa0, 0x43),
-                    OpState::Failed => egui::Color32::from_rgb(0xc0, 0x3a, 0x2b),
-                    OpState::Active => egui::Color32::from_rgb(0x1f, 0x6f, 0xc3),
-                };
-                match bar.total {
-                    Some(t) if t > 0 => {
-                        let frac = (bar.done as f32 / t as f32).clamp(0.0, 1.0);
-                        let text = format!("{}  ({}/{} KB)", bar.label, bar.done / 1024, t / 1024);
-                        ui.add(egui::ProgressBar::new(frac).fill(color).text(text));
-                    }
-                    _ => {
-                        // 总大小未知（如全片擦除）：进行中显示旋转指示，完成后显示整条结果。
-                        if bar.state == OpState::Active {
-                            ui.horizontal(|ui| {
-                                ui.add(egui::Spinner::new());
-                                ui.label(format!("{}  ...", bar.label));
-                            });
-                        } else {
-                            let frac = if bar.state == OpState::Done { 1.0 } else { 0.0 };
-                            ui.add(egui::ProgressBar::new(frac).fill(color).text(&bar.label));
-                        }
-                    }
-                }
-            }
-        }
     }
 }

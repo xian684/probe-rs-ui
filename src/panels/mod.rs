@@ -6,6 +6,7 @@ mod arm_panel;
 mod central;
 mod device;
 mod flash;
+mod flash_progress;
 mod log;
 mod mem_panel;
 mod rtt_panel;

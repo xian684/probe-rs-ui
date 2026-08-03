@@ -2,6 +2,7 @@
 //!
 //! 拆分子模块：
 //! - [`manual`]：手动指定目标（搜索 + 三级联动）
+//! - [`external`]：外部芯片包视图
 //! - [`target_gen`]：高级芯片配置（CMSIS Pack 生成）
 //! - [`info`]：目标信息框
 
@@ -11,6 +12,7 @@ use crate::app::{DeviceTab, ProbeUiApp, TARGET_INFO_MIN_H};
 use crate::i18n::Msg;
 use crate::worker::{BootMode, WorkerCommand};
 
+mod external;
 mod info;
 mod manual;
 mod target_gen;
