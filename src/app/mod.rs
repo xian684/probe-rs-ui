@@ -290,15 +290,59 @@ impl ProbeUiApp {
     }
 
     /// 将外部加载的芯片族合并进手动选型列表（品牌归入『外部芯片包』）。
-    fn merge_chip_file(&mut self, info: ChipFileInfo) {
+    ///
+    /// 去重规则：
+    /// - 已存在同名的**外部**芯片族：不重复添加，仅并入新型号（并集）；
+    /// - 已存在同名的**内置**芯片族：跳过（内置优先，避免干扰内置定义）；
+    /// - 否则新增一条目。
+    fn merge_chip_file(&mut self, info: ChipFileInfo) -> ChipMergeResult {
+        let external_brand = self.t(Msg::BrandExternal).to_owned();
+        // 外部同名家族：并集合并型号。
+        if let Some(existing) = self
+            .chip_families
+            .iter_mut()
+            .find(|f| f.brand == external_brand && f.name == info.family_name)
+        {
+            let before = existing.chips.len();
+            for c in &info.chips {
+                if !existing.chips.contains(c) {
+                    existing.chips.push(c.clone());
+                }
+            }
+            return if existing.chips.len() > before {
+                ChipMergeResult::Updated
+            } else {
+                ChipMergeResult::Skipped
+            };
+        }
+        // 内置同名家族：跳过。
+        if self
+            .chip_families
+            .iter()
+            .any(|f| f.name == info.family_name)
+        {
+            return ChipMergeResult::Skipped;
+        }
         let family = ChipFamilyInfo {
             name: info.family_name,
-            brand: self.t(Msg::BrandExternal).to_owned(),
+            brand: external_brand,
             chips: info.chips,
         };
         self.chip_families.push(family);
         self.chip_brands = crate::chips::group_brands(&self.chip_families);
+        ChipMergeResult::Added
     }
+}
+
+/// 芯片族合并结果（供去重日志反馈）。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ChipMergeResult {
+    /// 新增了一条外部芯片族。
+    Added,
+    /// 已存在，仅并入了新型号。
+    Updated,
+    /// 完全重复（或与内置同名），已跳过。
+    Skipped,
 }
 
 impl Drop for ProbeUiApp {

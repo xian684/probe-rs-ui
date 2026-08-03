@@ -4,7 +4,7 @@ use crate::i18n::Msg;
 use crate::t;
 use crate::worker::{OpState, WorkerEvent};
 
-use super::{OpBar, ProbeUiApp};
+use super::{ChipMergeResult, OpBar, ProbeUiApp};
 
 impl ProbeUiApp {
     pub(crate) fn handle_event(&mut self, ev: WorkerEvent) {
@@ -118,18 +118,30 @@ impl ProbeUiApp {
             WorkerEvent::ChipFileLoaded(Ok(info)) => {
                 let n = info.chips.len();
                 let name = info.family_name.clone();
-                self.merge_chip_file(info);
-                self.log_ok(t!(self.lang, Msg::ChipFileLoaded, name, n));
+                match self.merge_chip_file(info) {
+                    ChipMergeResult::Skipped => {
+                        self.log_warn(t!(self.lang, Msg::ChipFamilySkipped, name));
+                    }
+                    _ => {
+                        self.log_ok(t!(self.lang, Msg::ChipFileLoaded, name, n));
+                    }
+                }
             }
             WorkerEvent::ChipFileLoaded(Err(e)) => {
                 self.log_err(e);
             }
             WorkerEvent::PackGenerated(Ok(infos)) => {
                 let n = infos.len();
+                let mut skipped = 0;
                 for info in infos {
-                    self.merge_chip_file(info);
+                    if self.merge_chip_file(info) == ChipMergeResult::Skipped {
+                        skipped += 1;
+                    }
                 }
                 self.log_ok(t!(self.lang, Msg::PackGenerated, n));
+                if skipped > 0 {
+                    self.log_info(t!(self.lang, Msg::PackGeneratedSkipped, skipped));
+                }
             }
             WorkerEvent::PackGenerated(Err(e)) => {
                 self.log_err(e);
@@ -140,8 +152,11 @@ impl ProbeUiApp {
                 let loaded_n = result.loaded.len();
                 // 先保存结果供左侧面板展示，再移动 loaded 合并进选型列表。
                 self.tg_result = Some(result.clone());
+                let mut skipped = 0;
                 for info in result.loaded.drain(..) {
-                    self.merge_chip_file(info);
+                    if self.merge_chip_file(info) == ChipMergeResult::Skipped {
+                        skipped += 1;
+                    }
                 }
                 self.log_ok(t!(self.lang, Msg::TargetsGenerated, n));
                 for family in &result.families {
@@ -155,7 +170,13 @@ impl ProbeUiApp {
                     }
                 }
                 if loaded_n > 0 {
-                    self.log_info(t!(self.lang, Msg::TgLoadedToSelection, loaded_n));
+                    let merged = loaded_n - skipped;
+                    if merged > 0 {
+                        self.log_info(t!(self.lang, Msg::TgLoadedToSelection, merged));
+                    }
+                    if skipped > 0 {
+                        self.log_info(t!(self.lang, Msg::PackGeneratedSkipped, skipped));
+                    }
                 }
             }
             WorkerEvent::TargetGenDone(Err(e)) => {

@@ -155,7 +155,9 @@ pub enum Msg {
     AutoDetectedFirmware,
     UseOtherFirmware,
     ChipFileLoaded,
+    ChipFamilySkipped,
     PackGenerated,
+    PackGeneratedSkipped,
     RttStartedSummary,
     MemoryReadDone,
     MemoryWritten,
@@ -534,9 +536,19 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "Chip pack loaded: {} ({} variant(s)); select it manually on the left",
     ),
     (
+        Msg::ChipFamilySkipped,
+        "芯片族 {} 已存在，已跳过（避免重复添加）",
+        "Family {} already exists, skipped to avoid duplicates",
+    ),
+    (
         Msg::PackGenerated,
         "已从 CMSIS 包生成 {} 个芯片族，可在左侧手动选择",
         "Generated {} chip family(ies) from CMSIS pack; select them manually on the left",
+    ),
+    (
+        Msg::PackGeneratedSkipped,
+        "其中 {} 个芯片族已存在，已跳过",
+        "{} family(ies) already existed and were skipped",
     ),
     (
         Msg::RttStartedSummary,
