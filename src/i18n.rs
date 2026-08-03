@@ -436,8 +436,8 @@ const MSGS: &[(Msg, &str, &str)] = &[
     (Msg::TgVariants, "个型号", "variants"),
     (
         Msg::TgInputMissing,
-        "输入路径不存在: {}",
-        "Input path does not exist: {}",
+        "输入路径不存在: {}，请重新选择文件",
+        "Input path does not exist: {}. Please pick the file again",
     ),
     (
         Msg::TgNoSupportedFamily,
@@ -476,13 +476,13 @@ const MSGS: &[(Msg, &str, &str)] = &[
     ),
     (
         Msg::ArmGenerateFailed,
-        "从 ARM 在线索引生成失败: {}",
-        "Failed to generate from the ARM online index: {}",
+        "从 ARM 在线索引生成失败（请检查网络后重试）: {}",
+        "Failed to generate from the ARM online index (check your network and retry): {}",
     ),
     (
         Msg::ArmDownloadFailed,
-        "下载 Pack 失败: {}",
-        "Failed to download the Pack: {}",
+        "下载 Pack 失败（请检查网络后重试）: {}",
+        "Failed to download the Pack (check your network and retry): {}",
     ),
     (
         Msg::ArmDownloaded,
@@ -679,7 +679,7 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "Unsupported file format. Choose a .elf / .hex / .bin / .uf2 file",
     ),
     (Msg::FlashingPath, "开始烧录: {}", "Flashing: {}"),
-    (Msg::ConnectFirst, "请先连接目标芯片", "Connect to a target first"),
+    (Msg::ConnectFirst, "请先连接目标芯片（自动识别或手动选择型号）", "Connect to a target first (auto-detect or select a model)"),
     (
         Msg::ReadLenClamped,
         "读取长度已限制为 {} 字节",
@@ -703,7 +703,7 @@ const MSGS: &[(Msg, &str, &str)] = &[
     // ---- 后台线程 ----
     (
         Msg::NotConnectedErr,
-        "尚未连接到目标芯片，请先自动识别目标",
+        "尚未连接到目标芯片，请先自动识别或手动选择芯片型号",
         "Not connected to a target. Auto-detect or select the target first",
     ),
     (Msg::RttStoppedReconnect, "重新连接前已停止 RTT", "RTT stopped before reconnecting"),
@@ -712,8 +712,16 @@ const MSGS: &[(Msg, &str, &str)] = &[
     (Msg::RttStoppedRead, "读取期间已停止 RTT", "RTT stopped during read"),
     (Msg::RttStoppedManual, "RTT 已停止", "RTT stopped"),
     (Msg::NoProbeIndex, "未找到编号为 {} 的调试探针", "No debug probe with index {} found"),
-    (Msg::OpenProbeFailed, "打开探针失败: {}", "Failed to open probe: {}"),
-    (Msg::ConnectTargetFailed, "连接目标 {} 失败: {}", "Failed to connect to target {}: {}"),
+    (
+        Msg::OpenProbeFailed,
+        "打开探针失败: {}\n提示: 请检查探针驱动是否安装、USB 连接是否正常，以及探针是否被其他程序占用",
+        "Failed to open probe: {}\nTip: check the probe driver, USB connection, and that the probe is not in use by another program",
+    ),
+    (
+        Msg::ConnectTargetFailed,
+        "连接目标 {} 失败: {}\n提示: 请确认芯片型号是否正确、目标板供电与接线是否正常，必要时尝试『复位时连接』",
+        "Failed to connect to target {}: {}\nTip: verify the chip model, target power and wiring, or try 'Attach under reset'",
+    ),
     (
         Msg::AutoDetectFailed,
         "自动识别目标失败: {}。该探针可能不支持自动识别芯片（如 DAPLink/CMSIS-DAP），请在左侧『手动指定目标芯片』中搜索并选择芯片型号后重试",
@@ -724,23 +732,47 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "复位期间连接目标失败: {}。该探针可能不支持自动识别芯片（如 DAPLink/CMSIS-DAP），请在左侧『手动指定目标芯片』中搜索并选择芯片型号后重试",
         "Failed to attach under reset: {}. The probe may not support auto-identification (e.g. DAPLink/CMSIS-DAP). Please search and select the chip model under 'Manual Target Selection' on the left and retry",
     ),
-    (Msg::ResetFailed, "复位失败: {}", "Reset failed: {}"),
-    (Msg::ReadFileFailed, "读取文件失败: {}: {}", "Failed to read file: {}: {}"),
+    (
+        Msg::ResetFailed,
+        "复位失败: {}\n提示: 请检查目标连接与复位线",
+        "Reset failed: {}\nTip: check the target connection and reset line",
+    ),
+    (
+        Msg::ReadFileFailed,
+        "读取文件失败: {}（{}）",
+        "Failed to read file: {} ({})",
+    ),
     (
         Msg::PackGenFailed,
-        "生成芯片描述失败: {}",
-        "Failed to generate chip description: {}",
+        "生成芯片描述失败: {}\n提示: 请确认所选文件是有效的 CMSIS Pack（.pack/.pdsc）且未损坏",
+        "Failed to generate chip description: {}\nTip: make sure the selected file is a valid, uncorrupted CMSIS Pack (.pack/.pdsc)",
     ),
-    (Msg::PackNoChips, "未在包中找到可用芯片", "No usable chips found in the pack"),
+    (
+        Msg::PackNoChips,
+        "未在包中找到可用芯片\n提示: 若勾选了『仅生成已支持的芯片族』，可取消勾选后重试",
+        "No usable chips found in the pack\nTip: if 'Only supported families' is checked, uncheck it and retry",
+    ),
     (
         Msg::UnsupportedFileFormat,
         "不支持的文件格式: .{}，请选择 .elf / .hex / .bin / .uf2 文件",
         "Unsupported file format: .{}. Choose a .elf / .hex / .bin / .uf2 file",
     ),
-    (Msg::FlashFailed, "烧录失败: {}", "Flashing failed: {}"),
-    (Msg::EraseFailed, "全片擦除失败: {}", "Chip erase failed: {}"),
+    (
+        Msg::FlashFailed,
+        "烧录失败: {}\n提示: 请检查目标芯片型号与 Flash 算法、芯片是否被读保护锁定、供电是否稳定",
+        "Flashing failed: {}\nTip: check the chip model and flash algorithm, read-out protection, and power stability",
+    ),
+    (
+        Msg::EraseFailed,
+        "全片擦除失败: {}\n提示: 请检查芯片是否被读保护（RDP）锁定、目标连接是否稳定",
+        "Chip erase failed: {}\nTip: check for read-out protection (RDP) and a stable target connection",
+    ),
     (Msg::CreateFileFailed, "创建文件失败: {}", "Failed to create file: {}"),
-    (Msg::GetCoreFailed, "获取核心失败: {}", "Failed to get core: {}"),
+    (
+        Msg::GetCoreFailed,
+        "访问目标内核失败: {}",
+        "Failed to access the target core: {}",
+    ),
     (
         Msg::ReadFlashFailed,
         "读取 Flash 失败 (0x{}): {}",
@@ -805,7 +837,11 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "RTT read failed, stopped: {}",
     ),
     (Msg::RttNotStarted, "RTT 未启动或未连接目标", "RTT not started or not connected"),
-    (Msg::RttCoreFailed, "获取核心失败: {}", "Failed to get core: {}"),
+    (
+        Msg::RttCoreFailed,
+        "访问目标内核失败: {}",
+        "Failed to access the target core: {}",
+    ),
     (Msg::RttDownWriteFailed, "RTT 下行写入失败: {}", "RTT down write failed: {}"),
     (
         Msg::RttDownBufferFull,
