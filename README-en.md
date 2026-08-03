@@ -11,8 +11,9 @@ It automatically detects debug probes, identifies target chips, supports manual 
 - 🔍 **Probe auto-scan**: Enumerates connected debug probes (ST-Link, J-Link, DAPLink / CMSIS-DAP, etc.).
 - 🎯 **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
 - 🔌 **Connection mode**: Choose **Normal** or **Under Reset** connection, matching STM32 BOOT0/BOOT1 boot configurations — useful when target code interferes with SWD or when booting from system memory.
-- 🧩 **Manual chip selection**: Full built-in probe-rs chip database with three-level cascade selection by brand, family and variant, plus real-time keyword search (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
-- 📦 **Advanced chip config**: Embeds [target-gen](https://probe.rs/docs/tools/target-gen/) on the left — pick a local CMSIS pack (`.pack` / `.pdsc` / `.zip`) to generate chip descriptions, with two modes: **Generate** (files only) or **Generate & Import** (also adds them to the manual selection list). Duplicate families are deduplicated automatically (new variants merged), and existing YAML description files can also be loaded.
+- 🧩 **Manual chip selection**: Full built-in probe-rs chip database with three-level cascade selection by brand, family and variant, plus real-time keyword search; switch between **Built-in pack** and **External pack** views (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
+- 📦 **Advanced chip config**: Embeds [target-gen](https://probe.rs/docs/tools/target-gen/) on the left — pick a local CMSIS pack (`.pack` / `.pdsc` / `.zip`) to generate chip descriptions, with two modes: **Generate** (files only) or **Generate & Import**. Duplicate families are deduplicated automatically (new variants merged), and existing YAML description files can also be loaded.
+- 📦 **External pack**: Chips imported via YAML or CMSIS pack generation stay **separate from the built-in three-level menu** — pick a family from the dropdown and a variant from the list in the **External pack** view of the manual selection area, then connect by model with one click.
 - 📁 **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
 - ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`, including extensionless Rust ELF build artifacts.
 - ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
@@ -45,8 +46,9 @@ Every push to `master` builds a `probe-rs-ui-windows-x86_64.zip` with GitHub Act
 
 1. Connect the debug probe and target chip. The app scans probes on startup.
 2. Click **Auto-detect Target**; if your probe does not support auto-detection (e.g. DAPLink), pick the brand, family and variant under **Manual Target Selection**, then click **Connect by Model**.
-3. Pick a firmware file, or click **Select Project Folder...** to auto-locate compiled firmware.
-4. Toggle the flashing options as needed, then click **Flash**.
+3. If the target chip is not in the built-in database, switch to **Advanced chip config** on the left, pick a vendor CMSIS pack (`.pack` / `.pdsc` / `.zip`) and click **Generate & Import** (or load a YAML description file first); then in the manual selection area switch to the **External pack** view, pick the family and variant, and click **Connect by Model**.
+4. Pick a firmware file, or click **Select Project Folder...** to auto-locate compiled firmware.
+5. Toggle the flashing options as needed, then click **Flash**.
 
 ## Dependencies
 
