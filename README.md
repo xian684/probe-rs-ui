@@ -12,7 +12,7 @@
 - 🎯 **目标自动识别**：支持自动识别芯片型号（ST-Link / J-Link 等可自报型号的探针）。
 - 🔌 **连接方式可选**：支持「正常连接」与「复位期间连接」（Under Reset），对应 STM32 BOOT0/BOOT1 启动配置，便于在目标程序干扰 SWD 或需从系统存储器启动时连接。
 - 🧩 **手动指定芯片**：内置 probe-rs 全部芯片型号库，按品牌 → 系列 → 具体型号三级联动选择，支持关键字实时搜索（适用于 DAPLink / CMSIS-DAP 等无法自动识别的探针）。
-- 📦 **高级芯片配置**：左侧可折叠面板内置 [target-gen](https://probe.rs/docs/tools/target-gen/) 库，选择本地 CMSIS 包（`.pack` / `.pdsc` / `.zip` 或解压目录）即可自动生成芯片描述并纳入手动选型列表，支持「生成并连接」一键选型连接；也可加载现成的 YAML 描述文件。
+- 📦 **高级芯片配置**：左侧内置 [target-gen](https://probe.rs/docs/tools/target-gen/) 库，选择本地 CMSIS 包（`.pack` / `.pdsc` / `.zip`）即可生成芯片描述；支持「生成芯片描述」与「生成芯片描述并自动导入」两种模式（自动导入即纳入手动选型列表），同名芯片族自动去重（并集合并新型号），也可加载现成的 YAML 描述文件。
 - 📁 **固件自动定位**：选择项目文件夹后自动扫描常见构建产物（cargo `target/`、Keil `Objects/`、CubeIDE `Debug/`、CMake `build/` 等），自动选中最佳固件，多候选可下拉切换。
 - ⚡ **固件烧录**：支持 `.elf` / `.axf` / `.hex` / `.bin` / `.uf2` 格式，并可识别无扩展名的 Rust ELF 编译产物。
 - ⚙️ **可配置烧录选项**：全片擦除、烧录后校验、保留未写入字节、烧录后复位运行。
@@ -45,8 +45,9 @@ cargo build --release
 
 1. 连接调试探针与目标芯片，启动程序后自动扫描探针。
 2. 点击 **自动识别目标**；若探针不支持自动识别（如 DAPLink），在左侧 **手动指定目标芯片** 中按品牌、系列选择具体型号后点击 **按型号连接**。
-3. 选择固件文件，或点击 **选择项目文件夹...** 让程序自动定位编译产物。
-4. 按需勾选烧录选项，点击 **开始烧录**。
+3. 若目标芯片不在内置库中，可在左侧切换到 **高级芯片配置**，选择厂商 CMSIS Pack（`.pack` / `.pdsc` / `.zip`）点击 **生成芯片描述并自动导入**，即可在手动选型中按型号连接。
+4. 选择固件文件，或点击 **选择项目文件夹...** 让程序自动定位编译产物。
+5. 按需勾选烧录选项，点击 **开始烧录**。
 
 ## 依赖版本
 
@@ -54,6 +55,7 @@ cargo build --release
 | ---- | ---- |
 | eframe / egui | 0.31 |
 | probe-rs | 0.32 |
+| target-gen | 0.32 |
 | rfd | 0.17 |
 
 ## 项目结构
@@ -63,15 +65,15 @@ build.rs
 assets/
   └── icon.ico     Windows 程序图标
 src/
-├── main.rs    程序入口、窗口配置与图标
-├── app.rs     应用状态、事件处理与主循环
-├── panels/    界面面板渲染（top / device / rtt_panel / flash）
-├── worker.rs  后台工作线程：探针扫描、连接、烧录、擦除、复位
-├── chips.rs   内置芯片库枚举与品牌分组
-├── firmware.rs 固件扫描与格式识别（ELF/HEX/BIN/UF2）
-├── rtt.rs     RTT 会话生命周期与通道读写
-├── fonts.rs   CJK 字体加载
-└── i18n.rs    语言支持（中文 / English）
+├── main.rs       程序入口、窗口配置与图标
+├── app/          应用状态与入口（mod / settings / events / actions）
+├── panels/       界面面板渲染（top / device / central / log / rtt / mem）
+├── worker/       后台工作线程（probe / flash / memory / rtt / target_gen / run）
+├── chips.rs      内置芯片库枚举与品牌分组
+├── firmware.rs   固件扫描与格式识别（ELF/HEX/BIN/UF2）
+├── rtt.rs        RTT 会话生命周期与通道读写
+├── fonts.rs      CJK 字体加载
+└── i18n.rs       语言支持（中文 / English）
 ```
 
 ## 常见问题

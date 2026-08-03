@@ -12,7 +12,7 @@ It automatically detects debug probes, identifies target chips, supports manual 
 - 🎯 **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
 - 🔌 **Connection mode**: Choose **Normal** or **Under Reset** connection, matching STM32 BOOT0/BOOT1 boot configurations — useful when target code interferes with SWD or when booting from system memory.
 - 🧩 **Manual chip selection**: Full built-in probe-rs chip database with three-level cascade selection by brand, family and variant, plus real-time keyword search (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
-- 📦 **Advanced chip config**: A collapsible panel on the left embeds [target-gen](https://probe.rs/docs/tools/target-gen/) — pick a local CMSIS pack (`.pack` / `.pdsc` / `.zip` or an unzipped directory) to auto-generate chip descriptions into the manual selection list, with one-click **Generate & Connect**; existing YAML description files can also be loaded.
+- 📦 **Advanced chip config**: Embeds [target-gen](https://probe.rs/docs/tools/target-gen/) on the left — pick a local CMSIS pack (`.pack` / `.pdsc` / `.zip`) to generate chip descriptions, with two modes: **Generate** (files only) or **Generate & Import** (also adds them to the manual selection list). Duplicate families are deduplicated automatically (new variants merged), and existing YAML description files can also be loaded.
 - 📁 **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
 - ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`, including extensionless Rust ELF build artifacts.
 - ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.
@@ -37,9 +37,9 @@ cargo build --release
 
 The executable is produced at `target/release/probe-rs-ui` (`probe-rs-ui.exe` on Windows). You can run it directly.
 
-### Linux / macOS packages
+### Windows package
 
-Every push to `master` builds `.tar.gz` packages for Linux x86_64, macOS Intel, and macOS Apple Silicon with GitHub Actions. Download them from the relevant run's artifacts on the repository [Actions page](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml).
+Every push to `master` builds a `probe-rs-ui-windows-x86_64.zip` with GitHub Actions. Download it from the relevant run's artifacts on the repository [Actions page](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml). Pushing a `v*` tag (e.g. `v1.0.0`) also creates a GitHub Release with the zip attached.
 
 ## Usage
 
@@ -54,6 +54,7 @@ Every push to `master` builds `.tar.gz` packages for Linux x86_64, macOS Intel, 
 | ---------- | ------- |
 | eframe / egui | 0.31 |
 | probe-rs | 0.32 |
+| target-gen | 0.32 |
 | rfd | 0.17 |
 
 ## Project Structure
@@ -63,15 +64,15 @@ build.rs
 assets/
   └── icon.ico     Windows app icon
 src/
-├── main.rs    Entry point, window configuration and icon
-├── app.rs     App state, event handling and main loop
-├── panels/    egui panel rendering (top / device / rtt_panel / flash)
-├── worker.rs  Background thread: probe scan, connect, flash, erase, reset
-├── chips.rs   Built-in chip database enumeration and brand grouping
-├── firmware.rs Firmware scanning and format detection (ELF/HEX/BIN/UF2)
-├── rtt.rs     RTT session lifecycle and channel I/O
-├── fonts.rs   CJK font loading
-└── i18n.rs    Language support (中文 / English)
+├── main.rs       Entry point, window configuration and icon
+├── app/          App state and entry (mod / settings / events / actions)
+├── panels/       egui panel rendering (top / device / central / log / rtt / mem)
+├── worker/       Background thread (probe / flash / memory / rtt / target_gen / run)
+├── chips.rs      Built-in chip database enumeration and brand grouping
+├── firmware.rs   Firmware scanning and format detection (ELF/HEX/BIN/UF2)
+├── rtt.rs        RTT session lifecycle and channel I/O
+├── fonts.rs      CJK font loading
+└── i18n.rs       Language support (中文 / English)
 ```
 
 ## FAQ
