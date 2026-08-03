@@ -37,10 +37,12 @@ jobs:
             -DestinationPath "dist/probe-rs-ui-windows-x86_64.zip" -Force
 
       - name: Upload artifact
+        # 直接上传 exe：GitHub 下载 artifacts 时会再包一层 zip，
+        # 若上传 zip 会导致用户需要解压两次；上传 exe 则解压一次即可用。
         uses: actions/upload-artifact@v4
         with:
           name: probe-rs-ui-windows-x86_64
-          path: dist/probe-rs-ui-windows-x86_64.zip
+          path: target/release/probe-rs-ui.exe
           if-no-files-found: error
           retention-days: 30
 
