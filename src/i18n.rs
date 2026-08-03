@@ -390,7 +390,7 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "勾选后仅保留 probe-rs 内置支持芯片族的 target 定义，减少无关文件",
         "When checked, only targets for probe-rs built-in supported families are kept",
     ),
-    (Msg::TgGenerate, "生成芯片描述", "Generate"),
+    (Msg::TgGenerate, "生成芯片描述并自动导入", "Generate & Import"),
     (
         Msg::TgGenerating,
         "正在从 CMSIS Pack 生成 target 定义，请稍候...",
