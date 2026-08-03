@@ -89,6 +89,10 @@ pub struct ProbeUiApp {
     pub(crate) manual_target: String,
     pub(crate) chip_families: Vec<ChipFamilyInfo>,
     pub(crate) chip_brands: Vec<ChipBrandInfo>,
+    /// 通过加载 YAML / CMSIS Pack 导入的外部芯片族（独立于内置三级菜单）。
+    pub(crate) external_families: Vec<ChipFamilyInfo>,
+    /// 外部芯片包下拉选中的家族索引。
+    pub(crate) selected_external_family: Option<usize>,
     pub(crate) selected_brand: Option<usize>,
     pub(crate) selected_family: Option<usize>,
     pub(crate) chip_search: String,
@@ -165,6 +169,8 @@ impl ProbeUiApp {
             manual_target: String::new(),
             chip_families,
             chip_brands,
+            external_families: Vec::new(),
+            selected_external_family: None,
             selected_brand: None,
             selected_family: None,
             chip_search: String::new(),
@@ -289,19 +295,16 @@ impl ProbeUiApp {
         self.log(text, LogLevel::Error);
     }
 
-    /// 将外部加载的芯片族合并进手动选型列表（品牌归入『外部芯片包』）。
+    /// 将外部加载的芯片族合并进『外部芯片包』列表（独立于内置三级菜单）。
     ///
     /// 去重规则：
-    /// - 已存在同名的**外部**芯片族：不重复添加，仅并入新型号（并集）；
-    /// - 已存在同名的**内置**芯片族：跳过（内置优先，避免干扰内置定义）；
+    /// - 已存在同名的外部芯片族：不重复添加，仅并入新型号（并集）；
     /// - 否则新增一条目。
     fn merge_chip_file(&mut self, info: ChipFileInfo) -> ChipMergeResult {
-        let external_brand = self.t(Msg::BrandExternal).to_owned();
-        // 外部同名家族：并集合并型号。
         if let Some(existing) = self
-            .chip_families
+            .external_families
             .iter_mut()
-            .find(|f| f.brand == external_brand && f.name == info.family_name)
+            .find(|f| f.name == info.family_name)
         {
             let before = existing.chips.len();
             for c in &info.chips {
@@ -315,21 +318,12 @@ impl ProbeUiApp {
                 ChipMergeResult::Skipped
             };
         }
-        // 内置同名家族：跳过。
-        if self
-            .chip_families
-            .iter()
-            .any(|f| f.name == info.family_name)
-        {
-            return ChipMergeResult::Skipped;
-        }
         let family = ChipFamilyInfo {
             name: info.family_name,
-            brand: external_brand,
+            brand: self.t(Msg::BrandExternal).to_owned(),
             chips: info.chips,
         };
-        self.chip_families.push(family);
-        self.chip_brands = crate::chips::group_brands(&self.chip_families);
+        self.external_families.push(family);
         ChipMergeResult::Added
     }
 }
