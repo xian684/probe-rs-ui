@@ -259,29 +259,7 @@ impl ProbeUiApp {
             self.manual_target = name;
         }
 
-        let enabled = !self.probes.is_empty()
-            && !self.connecting
-            && !self.busy
-            && !self.rtt_on
-            && !self.manual_target.trim().is_empty();
-        if ui
-            .add_enabled(
-                enabled,
-                egui::Button::new(self.icon("🔗", Msg::ConnectByModel))
-                    .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
-            )
-            .clicked()
-        {
-            let target = self.manual_target.trim().to_owned();
-            self.connecting = true;
-            self.busy = true;
-            self.log_info(t!(self.lang, Msg::ConnectingTo, target));
-            self.send(WorkerCommand::ConnectManual {
-                probe: self.selected_probe,
-                target,
-                boot_mode: self.boot_mode,
-            });
-        }
+        self.connect_manual_btn(ui);
     }
 
     /// 外部芯片包选择区：显示通过 YAML / CMSIS Pack 导入的芯片族，
@@ -345,6 +323,37 @@ impl ProbeUiApp {
             if let Some(name) = picked_chip {
                 self.manual_target = name;
             }
+        }
+
+        // 按型号连接：与内置芯片包视图共用同一个连接按钮。
+        ui.add_space(6.0);
+        self.connect_manual_btn(ui);
+    }
+
+    /// 「按型号连接」按钮：校验探针/连接状态后按当前 `manual_target` 发起连接。
+    fn connect_manual_btn(&mut self, ui: &mut egui::Ui) {
+        let enabled = !self.probes.is_empty()
+            && !self.connecting
+            && !self.busy
+            && !self.rtt_on
+            && !self.manual_target.trim().is_empty();
+        if ui
+            .add_enabled(
+                enabled,
+                egui::Button::new(self.icon("🔗", Msg::ConnectByModel))
+                    .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
+            )
+            .clicked()
+        {
+            let target = self.manual_target.trim().to_owned();
+            self.connecting = true;
+            self.busy = true;
+            self.log_info(t!(self.lang, Msg::ConnectingTo, target));
+            self.send(WorkerCommand::ConnectManual {
+                probe: self.selected_probe,
+                target,
+                boot_mode: self.boot_mode,
+            });
         }
     }
 }
