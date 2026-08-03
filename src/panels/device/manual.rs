@@ -21,16 +21,18 @@ impl ProbeUiApp {
                 .small()
                 .weak(),
         );
-        // horizontal_wrapped：面板宽度不足时按钮自动折行，避免被搜索框挤出面板。
-        ui.horizontal_wrapped(|ui| {
+        ui.horizontal(|ui| {
             ui.label(self.t(Msg::SearchModel));
             let hint = self.t(Msg::SearchHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.chip_search)
-                    .desired_width(150.0)
+                    .desired_width(f32::INFINITY)
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
+        });
+        // 加载芯片描述文件 / 从 CMSIS 包生成：固定在同一行（宽度不足时自动折行的是整行按钮组）。
+        ui.horizontal_wrapped(|ui| {
             if ui.button(self.icon("📄", Msg::LoadChipFile)).clicked()
                 && let Some(path) = rfd::FileDialog::new()
                     .add_filter("YAML", &["yaml", "yml"])
