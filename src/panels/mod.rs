@@ -2,6 +2,7 @@
 //!
 //! 通过 `ProbeUiApp` 的 `pub(crate)` 接口访问应用状态与事件处理。
 
+mod arm_panel;
 mod central;
 mod device;
 mod flash;

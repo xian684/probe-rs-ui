@@ -87,7 +87,8 @@ probe-rs-ui/
     │   │   ├── manual.rs    手动指定目标：内置/外部芯片包切换、搜索 + 三级联动 + 按型号连接
     │   │   ├── target_gen.rs 高级芯片配置：CMSIS Pack 生成芯片描述（生成/生成并导入）
     │   │   └── info.rs      目标信息框：连接后的芯片与内存映射展示
-    │   ├── central.rs       中央面板：烧录 / 内存查看器 / RTT 标签切换
+    │   ├── central.rs       中央面板：烧录 / 内存查看器 / RTT / ARM 索引标签切换
+    │   ├── arm_panel.rs     ARM 在线索引视图：搜索 Keil.pidx、下载并生成芯片描述
     │   ├── flash.rs         固件烧录视图：文件选择、烧录选项、进度条、读取固件
     │   ├── mem_panel.rs     内存查看器：任意地址读写与十六进制转储
     │   ├── rtt_panel.rs     RTT 日志视图：通道选择、收发、自动滚动

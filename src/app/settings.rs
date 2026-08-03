@@ -51,6 +51,7 @@ impl ProbeUiApp {
         self.central_tab = match cfg.central_tab.as_str() {
             "memory" => CentralTab::Memory,
             "rtt" => CentralTab::Rtt,
+            "arm" => CentralTab::ArmIndex,
             _ => CentralTab::Flash,
         };
         self.mem_start = cfg.mem_start;
@@ -109,6 +110,7 @@ impl ProbeUiApp {
                 CentralTab::Flash => "flash",
                 CentralTab::Memory => "memory",
                 CentralTab::Rtt => "rtt",
+                CentralTab::ArmIndex => "arm",
             }
             .into(),
             mem_start: self.mem_start,

@@ -50,6 +50,7 @@ pub(crate) enum CentralTab {
     Flash,
     Memory,
     Rtt,
+    ArmIndex,
 }
 
 /// 左侧设备面板『手动指定目标 / 高级芯片配置』互斥切换。

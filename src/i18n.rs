@@ -103,6 +103,8 @@ pub enum Msg {
     ArmSearchResult,
     ArmGenerated,
     ArmSearchTitle,
+    ArmViewHint,
+    ArmSelected,
     ArmSearchKeyword,
     ArmSearchHint,
     ArmSearching,
@@ -478,6 +480,16 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "Generated {} chip family(ies) from the ARM index",
     ),
     (Msg::ArmSearchTitle, "ARM 在线索引", "ARM Online Index"),
+    (
+        Msg::ArmViewHint,
+        "搜索公共 Pack 索引并下载生成芯片描述，结果自动导入外部芯片包视图",
+        "Search the public Pack index, download and generate chip descriptions; results are imported into the External pack view",
+    ),
+    (
+        Msg::ArmSelected,
+        "已选择: {}",
+        "Selected: {}",
+    ),
     (Msg::ArmSearchKeyword, "关键字:", "Keyword:"),
     (
         Msg::ArmSearchHint,

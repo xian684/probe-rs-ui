@@ -87,7 +87,8 @@ probe-rs-ui/
     │   │   ├── manual.rs    Manual target: built-in / external pack switch, search + cascade + connect
     │   │   ├── target_gen.rs Advanced chip config: CMSIS Pack → chip descriptions (generate / generate & import)
     │   │   └── info.rs      Target info box: chip & memory map after connect
-    │   ├── central.rs       Central panel: flash / memory viewer / RTT tabs
+    │   ├── central.rs       Central panel: flash / memory viewer / RTT / ARM index tabs
+    │   ├── arm_panel.rs     ARM online index view: search Keil.pidx, download & generate
     │   ├── flash.rs         Flashing view: file picker, options, progress, read firmware
     │   ├── mem_panel.rs     Memory viewer: arbitrary-address R/W with hex dump
     │   ├── rtt_panel.rs     RTT log view: channel select, send/receive, auto-scroll
