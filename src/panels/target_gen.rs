@@ -75,7 +75,7 @@ impl ProbeUiApp {
             if ui
                 .add_enabled(
                     can_generate,
-                    egui::Button::new(self.icon("⚙️", Msg::TgGenerate))
+                    egui::Button::new(self.icon("🔧", Msg::TgGenerate))
                         .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3))
                         .min_size(egui::vec2(150.0, 28.0)),
                 )
