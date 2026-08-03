@@ -303,7 +303,7 @@ impl ProbeUiApp {
                     }
             }
         });
-        // 型号列表：显示选中家族的芯片型号。
+        // 型号列表：显示选中家族的芯片型号（高度压缩，保持连接按钮可见）。
         if let Some(fam) = self
             .selected_external_family
             .and_then(|i| self.external_families.get(i))
@@ -311,7 +311,7 @@ impl ProbeUiApp {
             let mut picked_chip: Option<String> = None;
             egui::ScrollArea::vertical()
                 .id_salt("ext_chip_list")
-                .max_height(150.0)
+                .max_height(130.0)
                 .show(ui, |ui| {
                     for name in &fam.chips {
                         let selected = self.manual_target == *name;
