@@ -42,6 +42,13 @@ pub(crate) enum CentralTab {
     Rtt,
 }
 
+/// 左侧设备面板『手动指定目标 / 高级芯片配置』互斥切换。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DeviceTab {
+    Manual,
+    Advanced,
+}
+
 pub(crate) struct LogEntry {
     pub(crate) text: String,
     pub(crate) level: LogLevel,
@@ -76,6 +83,7 @@ pub struct ProbeUiApp {
     pub(crate) selected_family: Option<usize>,
     pub(crate) chip_search: String,
     pub(crate) show_manual: bool,
+    pub(crate) device_tab: DeviceTab,
 
     pub(crate) file_path: String,
     pub(crate) chip_erase: bool,
@@ -154,6 +162,7 @@ impl ProbeUiApp {
             selected_family: None,
             chip_search: String::new(),
             show_manual: false,
+            device_tab: DeviceTab::Manual,
             file_path: String::new(),
             chip_erase: false,
             verify: true,
@@ -263,8 +272,8 @@ impl ProbeUiApp {
             BootMode::Normal
         };
         self.manual_target = cfg.manual_target;
-        if !self.manual_target.trim().is_empty() {
-            if let Some(family_idx) = self
+        if !self.manual_target.trim().is_empty()
+            && let Some(family_idx) = self
                 .chip_families
                 .iter()
                 .position(|f| f.chips.iter().any(|c| c == &self.manual_target))
@@ -275,7 +284,6 @@ impl ProbeUiApp {
                     .iter()
                     .position(|b| b.families.contains(&family_idx));
             }
-        }
         self.file_path = cfg.file_path;
         self.firmware_root = cfg.firmware_root;
         self.chip_erase = cfg.chip_erase;
@@ -599,11 +607,10 @@ impl ProbeUiApp {
                 self.rtt_on = true;
                 self.rtt_up_channels = up_channels;
                 self.rtt_down_channels = down_channels;
-                if let Some(v) = self.rtt_view_channel {
-                    if v >= up_channels {
+                if let Some(v) = self.rtt_view_channel
+                    && v >= up_channels {
                         self.rtt_view_channel = None;
                     }
-                }
                 if self.rtt_send_channel >= down_channels.max(1) {
                     self.rtt_send_channel = 0;
                 }

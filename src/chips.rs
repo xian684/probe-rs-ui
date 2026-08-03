@@ -70,11 +70,10 @@ fn family_brand(f: &probe_rs::config::ChipFamily) -> String {
     if lower.contains("generic") && (lower.contains("risc-v") || lower.contains("riscv")) {
         return "RISC-V".to_owned();
     }
-    if let Some(code) = f.manufacturer {
-        if let Some(raw) = code.get() {
+    if let Some(code) = f.manufacturer
+        && let Some(raw) = code.get() {
             return normalize_brand(raw);
         }
-    }
     "Other".to_owned()
 }
 

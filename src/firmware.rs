@@ -36,9 +36,9 @@ pub fn scan_firmware(root: &Path) -> (Vec<FirmwareCandidate>, Option<usize>) {
                 }
                 let child_in_target = in_target || name == "target";
                 stack.push((path, depth + 1, child_in_target));
-            } else if ft.is_file() {
-                if let Some(kind) = firmware_kind(&path) {
-                    if let Ok(meta) = entry.metadata() {
+            } else if ft.is_file()
+                && let Some(kind) = firmware_kind(&path)
+                    && let Ok(meta) = entry.metadata() {
                         if meta.len() == 0 {
                             continue;
                         }
@@ -55,8 +55,6 @@ pub fn scan_firmware(root: &Path) -> (Vec<FirmwareCandidate>, Option<usize>) {
                             kind,
                         });
                     }
-                }
-            }
         }
     }
     candidates.sort_by(|a, b| {

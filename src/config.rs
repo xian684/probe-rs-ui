@@ -81,11 +81,10 @@ impl Default for AppConfig {
 
 /// 配置文件路径：优先与可执行文件同目录（便于便携使用），否则使用当前目录。
 pub fn config_path() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent() {
             return dir.join("config.toml");
         }
-    }
     std::env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("config.toml")
@@ -101,11 +100,10 @@ pub fn load() -> AppConfig {
 
 pub fn save(cfg: &AppConfig) {
     let path = config_path();
-    if let Ok(text) = toml::to_string(cfg) {
-        if std::fs::write(&path, text).is_ok() {
+    if let Ok(text) = toml::to_string(cfg)
+        && std::fs::write(&path, text).is_ok() {
             set_hidden(&path);
         }
-    }
 }
 
 /// Windows 下将配置文件标记为隐藏，避免在可执行文件目录中显眼地出现。

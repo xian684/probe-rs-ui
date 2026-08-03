@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use eframe::egui;
 
-use crate::app::{ProbeUiApp, TARGET_INFO_MIN_H};
+use crate::app::{DeviceTab, ProbeUiApp, TARGET_INFO_MIN_H};
 use crate::i18n::Msg;
 use crate::t;
 use crate::worker::{BootMode, WorkerCommand};
@@ -141,22 +141,28 @@ impl ProbeUiApp {
         }
 
         ui.add_space(4.0);
-        // 高级芯片配置：加载本地 CMSIS Pack，自动生成芯片描述并连接目标。
-        egui::CollapsingHeader::new(self.t(Msg::AdvancedChipConfig))
-            .id_salt("advanced_chip_config")
-            .default_open(false)
-            .show(ui, |ui| self.advanced_chip_config_ui(ui));
-        ui.add_space(4.0);
-
+        // 手动指定目标 / 高级芯片配置：互斥切换的两个子面板。
         ui.horizontal(|ui| {
-            ui.heading(self.t(Msg::ManualTargetSel));
-            if self.show_manual {
-                ui.colored_label(
-                    egui::Color32::from_rgb(0xc0, 0x3a, 0x2b),
-                    self.t(Msg::AutoDetectFailedHint),
-                );
-            }
+            let l_manual = self.icon("🧩", Msg::ManualTargetSel);
+            let l_adv = self.icon("📦", Msg::AdvancedChipConfig);
+            ui.selectable_value(&mut self.device_tab, DeviceTab::Manual, l_manual);
+            ui.selectable_value(&mut self.device_tab, DeviceTab::Advanced, l_adv);
         });
+        ui.separator();
+        match self.device_tab {
+            DeviceTab::Manual => self.manual_target_ui(ui),
+            DeviceTab::Advanced => self.advanced_chip_config_ui(ui),
+        }
+    }
+
+    /// 手动指定目标：搜索 + 品牌/系列/型号三级联动 + 按型号连接。
+    fn manual_target_ui(&mut self, ui: &mut egui::Ui) {
+        if self.show_manual {
+            ui.colored_label(
+                egui::Color32::from_rgb(0xc0, 0x3a, 0x2b),
+                self.t(Msg::AutoDetectFailedHint),
+            );
+        }
         ui.label(
             egui::RichText::new(self.t(Msg::ManualTargetHint))
                 .small()
@@ -171,24 +177,22 @@ impl ProbeUiApp {
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
-            if ui.button(self.icon("📄", Msg::LoadChipFile)).clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button(self.icon("📄", Msg::LoadChipFile)).clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("YAML", &["yaml", "yml"])
                     .pick_file()
                 {
                     self.log_info(t!(self.lang, Msg::LoadingChipFile, path.display()));
                     self.send(WorkerCommand::LoadChipFile { path });
                 }
-            }
-            if ui.button(self.icon("📦", Msg::GenerateFromPack)).clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button(self.icon("📦", Msg::GenerateFromPack)).clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("CMSIS Pack", &["pack", "pdsc", "zip"])
                     .pick_file()
                 {
                     self.log_info(t!(self.lang, Msg::GeneratingFromPack, path.display()));
                     self.send(WorkerCommand::GeneratePack { path });
                 }
-            }
         });
 
         if !self.manual_target.is_empty() {
@@ -368,23 +372,19 @@ impl ProbeUiApp {
         if let Some((bi, first_fam)) = picked_brand {
             self.selected_brand = Some(bi);
             self.selected_family = first_fam;
-            if self.manual_target.is_empty() {
-                if let Some(fam) = first_fam.and_then(|i| self.chip_families.get(i)) {
-                    if let Some(first) = fam.chips.first() {
+            if self.manual_target.is_empty()
+                && let Some(fam) = first_fam.and_then(|i| self.chip_families.get(i))
+                    && let Some(first) = fam.chips.first() {
                         self.manual_target = first.clone();
                     }
-                }
-            }
         }
         if let Some(i) = picked_family {
             self.selected_family = Some(i);
-            if self.manual_target.is_empty() {
-                if let Some(fam) = self.chip_families.get(i) {
-                    if let Some(first) = fam.chips.first() {
+            if self.manual_target.is_empty()
+                && let Some(fam) = self.chip_families.get(i)
+                    && let Some(first) = fam.chips.first() {
                         self.manual_target = first.clone();
                     }
-                }
-            }
         }
         if let Some(name) = picked_chip {
             self.manual_target = name;
@@ -434,19 +434,17 @@ impl ProbeUiApp {
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
-            if ui.button(self.icon("📂", Msg::TgBrowseFile)).clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button(self.icon("📂", Msg::TgBrowseFile)).clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("CMSIS Pack", &["pack", "pdsc", "zip"])
                     .pick_file()
                 {
                     self.tg_input = path.display().to_string();
                 }
-            }
-            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked() {
-                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked()
+                && let Some(dir) = rfd::FileDialog::new().pick_folder() {
                     self.tg_input = dir.display().to_string();
                 }
-            }
         });
 
         ui.add_space(4.0);
@@ -459,11 +457,10 @@ impl ProbeUiApp {
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
-            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked() {
-                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked()
+                && let Some(dir) = rfd::FileDialog::new().pick_folder() {
                     self.tg_output_dir = dir.display().to_string();
                 }
-            }
         });
 
         ui.add_space(4.0);
@@ -507,8 +504,8 @@ impl ProbeUiApp {
         }
 
         // 生成结果摘要（仅显示芯片族名与型号数，保持面板紧凑）。
-        if let Some(result) = &self.tg_result {
-            if !result.families.is_empty() {
+        if let Some(result) = &self.tg_result
+            && !result.families.is_empty() {
                 ui.add_space(4.0);
                 ui.label(egui::RichText::new(self.t(Msg::TgResult)).strong().small());
                 for family in &result.families {
@@ -523,7 +520,6 @@ impl ProbeUiApp {
                     );
                 }
             }
-        }
     }
 
     /// 校验输入/输出并发送生成命令。

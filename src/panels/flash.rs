@@ -22,27 +22,24 @@ impl ProbeUiApp {
                     .desired_width(320.0)
                     .hint_text(hint),
             );
-            if ui.button(self.icon("📂", Msg::Browse)).clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button(self.icon("📂", Msg::Browse)).clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter(self.t(Msg::FirmwareImage), &["elf", "hex", "bin", "uf2"])
                     .pick_file()
                 {
                     self.file_path = path.display().to_string();
                     self.log_info(t!(self.lang, Msg::SelectedFirmware, self.file_path));
                 }
-            }
             if ui
                 .button(self.icon("📁", Msg::SelectProjectFolder))
                 .clicked()
-            {
-                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                && let Some(dir) = rfd::FileDialog::new().pick_folder() {
                     self.firmware_root = dir.display().to_string();
                     self.firmware_scanning = true;
                     self.firmware_candidates.clear();
                     self.log_info(t!(self.lang, Msg::ScanningProject, self.firmware_root));
                     self.send(WorkerCommand::ScanFirmware { root: dir });
                 }
-            }
         });
         if let Some(fmt) = self.detected_format() {
             ui.label(t!(self.lang, Msg::FileFormat, fmt));
@@ -107,12 +104,11 @@ impl ProbeUiApp {
                         }
                     });
             });
-            if let Some(i) = chosen {
-                if let Some(c) = self.firmware_candidates.get(i) {
+            if let Some(i) = chosen
+                && let Some(c) = self.firmware_candidates.get(i) {
                     self.file_path = c.path.display().to_string();
                     self.log_info(t!(self.lang, Msg::SelectedFirmware, self.file_path));
                 }
-            }
         }
 
         ui.add_space(8.0);
@@ -210,8 +206,7 @@ impl ProbeUiApp {
                     .fill(egui::Color32::from_rgb(0x8a, 0x6d, 0x3b)),
             )
             .clicked()
-        {
-            if let Some(path) = rfd::FileDialog::new()
+            && let Some(path) = rfd::FileDialog::new()
                 .add_filter("BIN", &["bin"])
                 .set_file_name("firmware.bin")
                 .save_file()
@@ -223,7 +218,6 @@ impl ProbeUiApp {
                 self.log_info(t!(self.lang, Msg::StartingRead, start, end));
                 self.send(WorkerCommand::ReadFlash { path, start, end });
             }
-        }
 
         ui.add_space(10.0);
         if !self.op_bars.is_empty() {
