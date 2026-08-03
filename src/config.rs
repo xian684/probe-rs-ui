@@ -40,6 +40,10 @@ pub struct AppConfig {
     pub mem_len: usize,
     /// 内存查看器写入起始地址。
     pub mem_write_start: u64,
+    /// Target 生成器最近使用的输入路径。
+    pub tg_input: String,
+    /// Target 生成器最近使用的输出目录。
+    pub tg_output_dir: String,
     /// 窗口大小（宽、高）。
     pub window_size: Option<[f32; 2]>,
     /// 窗口位置（x、y）。
@@ -67,6 +71,8 @@ impl Default for AppConfig {
             mem_start: 0,
             mem_len: 256,
             mem_write_start: 0,
+            tg_input: String::new(),
+            tg_output_dir: String::new(),
             window_size: None,
             window_pos: None,
         }

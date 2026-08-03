@@ -3,6 +3,8 @@
 use eframe::egui;
 
 use crate::app::{LogLevel, ProbeUiApp};
+use crate::i18n::Msg;
+use crate::t;
 
 impl ProbeUiApp {
     /// 底部日志面板：显示操作日志，可清空。
@@ -13,18 +15,15 @@ impl ProbeUiApp {
             .show(ctx, |ui| {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    ui.heading(self.t("日志", "Log"));
-                    if ui.button(self.icon("🗑", "清空", "Clear")).clicked() {
+                    ui.heading(self.t(Msg::Log));
+                    if ui.button(self.icon("🗑", Msg::Clear)).clicked() {
                         self.log.clear();
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(
-                            egui::RichText::new(self.lang.pick(
-                                format!("共 {} 条", self.log.len()),
-                                format!("{} entries", self.log.len()),
-                            ))
-                            .small()
-                            .weak(),
+                            egui::RichText::new(t!(self.lang, Msg::LogEntries, self.log.len()))
+                                .small()
+                                .weak(),
                         );
                     });
                 });

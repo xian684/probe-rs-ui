@@ -3,6 +3,8 @@
 use eframe::egui;
 
 use crate::app::{ProbeUiApp, TARGET_INFO_MIN_H};
+use crate::i18n::Msg;
+use crate::t;
 use crate::worker::{BootMode, WorkerCommand};
 
 impl ProbeUiApp {
@@ -21,7 +23,7 @@ impl ProbeUiApp {
                     });
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.add_space(6.0);
-                    ui.heading(self.t("设备检测", "Device Detection"));
+                    ui.heading(self.t(Msg::DeviceDetection));
                     ui.separator();
                     egui::ScrollArea::vertical()
                         .id_salt("device_scroll")
@@ -33,14 +35,14 @@ impl ProbeUiApp {
 
     fn device_panel_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(self.t("调试探针:", "Probe:"));
+            ui.label(self.t(Msg::ProbeLabel));
             egui::ComboBox::from_id_salt("probe_sel")
                 .width(210.0)
                 .selected_text(
                     self.probes
                         .get(self.selected_probe)
                         .map(|p| p.identifier.as_str())
-                        .unwrap_or(self.t("未选择", "Not selected")),
+                        .unwrap_or(self.t(Msg::NotSelected)),
                 )
                 .show_ui(ui, |ui| {
                     for p in &self.probes {
@@ -55,47 +57,41 @@ impl ProbeUiApp {
                 });
             let enabled = !self.probing && !self.connecting && !self.busy;
             if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new(self.icon("🔄", "重新扫描", "Rescan")),
-                )
+                .add_enabled(enabled, egui::Button::new(self.icon("🔄", Msg::Rescan)))
                 .clicked()
             {
                 self.probing = true;
-                self.log_info(self.t("正在扫描探针...", "Scanning probes..."));
+                self.log_info(self.t(Msg::ScanningProbes));
                 self.send(WorkerCommand::Scan);
             }
         });
         if self.probing {
             ui.horizontal(|ui| {
                 ui.add(egui::Spinner::new());
-                ui.label(self.t("扫描中...", "Scanning..."));
+                ui.label(self.t(Msg::Scanning));
             });
         }
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.label(self.t("连接方式:", "Connection mode:"));
+            ui.label(self.t(Msg::ConnectionMode));
             egui::ComboBox::from_id_salt("boot_mode_sel")
                 .width(200.0)
                 .selected_text(match self.boot_mode {
-                    BootMode::Normal => self.t("正常连接", "Normal"),
-                    BootMode::UnderReset => self.t("复位期间连接", "Under Reset"),
+                    BootMode::Normal => self.t(Msg::BootNormal),
+                    BootMode::UnderReset => self.t(Msg::BootUnderReset),
                 })
                 .show_ui(ui, |ui| {
-                    let l_normal = self.t("正常连接", "Normal");
-                    let l_under_reset = self.t("复位期间连接", "Under Reset");
+                    let l_normal = self.t(Msg::BootNormal);
+                    let l_under_reset = self.t(Msg::BootUnderReset);
                     ui.selectable_value(&mut self.boot_mode, BootMode::Normal, l_normal);
                     ui.selectable_value(&mut self.boot_mode, BootMode::UnderReset, l_under_reset);
                 });
         });
         ui.label(
-            egui::RichText::new(self.t(
-                "正常连接：从主 Flash 启动（BOOT0=0）；复位期间连接：保持目标复位直至连接完成（常用于 BOOT0 拉高从系统存储器启动等场景）",
-                "Normal: boot from main flash (BOOT0=0); Under Reset: keep the target in reset until connected (e.g. booting from system memory with BOOT0 high)",
-            ))
-            .small()
-            .weak(),
+            egui::RichText::new(self.t(Msg::BootModeHint))
+                .small()
+                .weak(),
         );
 
         ui.add_space(6.0);
@@ -108,7 +104,7 @@ impl ProbeUiApp {
             if ui
                 .add_enabled(
                     has_probe,
-                    egui::Button::new(self.icon("🔍", "自动识别目标", "Auto-detect Target"))
+                    egui::Button::new(self.icon("🔍", Msg::AutoDetectTarget))
                         .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                 )
                 .clicked()
@@ -116,7 +112,7 @@ impl ProbeUiApp {
                 self.connecting = true;
                 self.busy = true;
                 self.op_bars.clear();
-                self.log_info(self.t("正在自动识别目标芯片...", "Auto-detecting target chip..."));
+                self.log_info(self.t(Msg::AutoDetecting));
                 self.send(WorkerCommand::ConnectAuto {
                     probe: self.selected_probe,
                     boot_mode: self.boot_mode,
@@ -126,59 +122,68 @@ impl ProbeUiApp {
             if ui
                 .add_enabled(
                     connected,
-                    egui::Button::new(self.icon("🔌", "断开", "Disconnect")),
+                    egui::Button::new(self.icon("🔌", Msg::Disconnect)),
                 )
                 .clicked()
             {
                 self.connected = None;
-                self.log_info(self.t("已断开连接", "Disconnected"));
+                self.log_info(self.t(Msg::Disconnected));
                 self.send(WorkerCommand::Disconnect);
             }
         });
         if self.connecting {
             ui.horizontal(|ui| {
                 ui.add(egui::Spinner::new());
-                ui.label(self.t("正在连接目标...", "Connecting to target..."));
+                ui.label(self.t(Msg::Connecting));
             });
         }
 
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            ui.heading(self.t("手动指定目标芯片", "Manual Target Selection"));
+            ui.heading(self.t(Msg::ManualTargetSel));
             if self.show_manual {
                 ui.colored_label(
                     egui::Color32::from_rgb(0xc0, 0x3a, 0x2b),
-                    self.t(
-                        "（自动识别失败，请手动选择）",
-                        "(auto-detection failed, select manually)",
-                    ),
+                    self.t(Msg::AutoDetectFailedHint),
                 );
             }
         });
         ui.label(
-            egui::RichText::new(self.t(
-                "DAPLink / CMSIS-DAP 等探针需手动选择芯片型号",
-                "DAPLink / CMSIS-DAP probes need manual chip selection",
-            ))
-            .small()
-            .weak(),
+            egui::RichText::new(self.t(Msg::ManualTargetHint))
+                .small()
+                .weak(),
         );
         ui.horizontal(|ui| {
-            ui.label(self.t("搜索型号:", "Search:"));
-            let hint = self.t("如 stm32f103 / nrf52840", "e.g. stm32f103 / nrf52840");
+            ui.label(self.t(Msg::SearchModel));
+            let hint = self.t(Msg::SearchHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.chip_search)
                     .desired_width(f32::INFINITY)
                     .font(egui::TextStyle::Small)
                     .hint_text(hint),
             );
+            if ui.button(self.icon("📄", Msg::LoadChipFile)).clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("YAML", &["yaml", "yml"])
+                    .pick_file()
+                {
+                    self.log_info(t!(self.lang, Msg::LoadingChipFile, path.display()));
+                    self.send(WorkerCommand::LoadChipFile { path });
+                }
+            }
+            if ui.button(self.icon("📦", Msg::GenerateFromPack)).clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("CMSIS Pack", &["pack", "pdsc", "zip"])
+                    .pick_file()
+                {
+                    self.log_info(t!(self.lang, Msg::GeneratingFromPack, path.display()));
+                    self.send(WorkerCommand::GeneratePack { path });
+                }
+            }
         });
 
         if !self.manual_target.is_empty() {
-            ui.label(self.lang.pick(
-                format!("已选型号: {}", self.manual_target),
-                format!("Selected: {}", self.manual_target),
-            ));
+            ui.label(t!(self.lang, Msg::SelectedChip, self.manual_target));
         }
 
         let filter = self.chip_search.trim().to_lowercase();
@@ -236,138 +241,145 @@ impl ProbeUiApp {
         self.selected_brand = sel_brand;
         self.selected_family = sel_family;
 
-        ui.columns(3, |cols| {
-            cols[0].label(
-                egui::RichText::new(self.t("品牌", "Brand"))
-                    .strong()
-                    .small(),
-            );
-            cols[1].label(
-                egui::RichText::new(self.t("系列", "Family"))
-                    .strong()
-                    .small(),
-            );
-            cols[2].label(
-                egui::RichText::new(self.t("具体型号", "Variant"))
-                    .strong()
-                    .small(),
-            );
+        // 三级联动：三列等宽，总宽度（含 2 个 4px 间距）不超过设备检测面板可用宽度。
+        let col_w = ((ui.available_width() - 8.0) / 3.0).floor();
+        let brand_w = col_w;
+        let family_w = col_w;
+        let variant_w = col_w;
 
-            let mut picked_brand: Option<(usize, Option<usize>)> = None;
-            egui::ScrollArea::vertical()
-                .id_salt("brand_list")
-                .max_height(220.0)
-                .show(&mut cols[0], |ui| {
-                    if brand_fams.is_empty() {
-                        ui.label(
-                            egui::RichText::new(self.t("未找到匹配的品牌", "No matching brand"))
-                                .weak(),
-                        );
-                    } else {
-                        for (bi, fams) in brand_fams.iter() {
-                            let brand = &self.chip_brands[*bi];
-                            let selected = Some(*bi) == sel_brand;
-                            let label =
-                                format!("{} ({})", self.brand_label(&brand.name), fams.len());
-                            if ui.selectable_label(selected, label).clicked() {
-                                picked_brand = Some((*bi, fams.first().copied()));
-                            }
-                        }
-                    }
-                });
+        let mut picked_brand: Option<(usize, Option<usize>)> = None;
+        let mut picked_family: Option<usize> = None;
+        let mut picked_chip: Option<String> = None;
 
-            let mut picked_family: Option<usize> = None;
-            egui::ScrollArea::vertical()
-                .id_salt("fam_list")
-                .max_height(220.0)
-                .show(&mut cols[1], |ui| {
-                    if fam_matches.is_empty() {
-                        ui.label(
-                            egui::RichText::new(self.t("无匹配系列", "No matching family")).weak(),
-                        );
-                    } else {
-                        for &i in &fam_matches {
-                            let fam = &self.chip_families[i];
-                            let selected = Some(i) == sel_family;
-                            if ui
-                                .selectable_label(
-                                    selected,
-                                    format!("{} ({})", fam.name, fam.chips.len()),
-                                )
-                                .clicked()
-                            {
-                                picked_family = Some(i);
-                            }
-                        }
-                    }
-                });
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
 
-            let fam_index = sel_family;
-            let mut picked_chip: Option<String> = None;
-            egui::ScrollArea::vertical()
-                .id_salt("chip_list")
-                .max_height(220.0)
-                .show(&mut cols[2], |ui| {
-                    match fam_index.and_then(|i| self.chip_families.get(i)) {
-                        Some(fam) => {
-                            let mut shown = 0;
-                            for name in &fam.chips {
-                                if !filter.is_empty() && !name.to_lowercase().contains(&filter) {
-                                    continue;
+            ui.allocate_ui_with_layout(
+                egui::vec2(brand_w, 240.0),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.label(egui::RichText::new(self.t(Msg::Brand)).strong().small());
+                    egui::ScrollArea::vertical()
+                        .id_salt("brand_list")
+                        .max_height(215.0)
+                        .show(ui, |ui| {
+                            if brand_fams.is_empty() {
+                                ui.label(egui::RichText::new(self.t(Msg::NoMatchingBrand)).weak());
+                            } else {
+                                for (bi, fams) in brand_fams.iter() {
+                                    let brand = &self.chip_brands[*bi];
+                                    let selected = Some(*bi) == sel_brand;
+                                    let label = format!(
+                                        "{} ({})",
+                                        self.brand_label(&brand.name),
+                                        fams.len()
+                                    );
+                                    if ui.selectable_label(selected, label).clicked() {
+                                        picked_brand = Some((*bi, fams.first().copied()));
+                                    }
                                 }
-                                let selected = self.manual_target == *name;
-                                if ui.selectable_label(selected, name).clicked() {
-                                    picked_chip = Some(name.clone());
-                                }
-                                shown += 1;
                             }
-                            if shown == 0 {
-                                ui.label(
-                                    egui::RichText::new(self.t(
-                                        "该系列下无匹配型号",
-                                        "No matching variant in this family",
-                                    ))
-                                    .weak(),
-                                );
-                            }
-                        }
-                        None => {
-                            ui.label(
-                                egui::RichText::new(self.t(
-                                    "请先在左侧选择芯片系列",
-                                    "Select a chip family on the left first",
-                                ))
-                                .weak(),
-                            );
-                        }
-                    }
-                });
+                        });
+                },
+            );
 
-            if let Some((bi, first_fam)) = picked_brand {
-                self.selected_brand = Some(bi);
-                self.selected_family = first_fam;
-                if self.manual_target.is_empty() {
-                    if let Some(fam) = first_fam.and_then(|i| self.chip_families.get(i)) {
-                        if let Some(first) = fam.chips.first() {
-                            self.manual_target = first.clone();
-                        }
-                    }
-                }
-            }
-            if let Some(i) = picked_family {
-                self.selected_family = Some(i);
-                if self.manual_target.is_empty() {
-                    if let Some(fam) = self.chip_families.get(i) {
-                        if let Some(first) = fam.chips.first() {
-                            self.manual_target = first.clone();
-                        }
-                    }
-                }
-            }
-            if let Some(name) = picked_chip {
-                self.manual_target = name;
-            }
+            ui.allocate_ui_with_layout(
+                egui::vec2(family_w, 240.0),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.label(egui::RichText::new(self.t(Msg::Family)).strong().small());
+                    egui::ScrollArea::vertical()
+                        .id_salt("fam_list")
+                        .max_height(215.0)
+                        .show(ui, |ui| {
+                            if fam_matches.is_empty() {
+                                ui.label(egui::RichText::new(self.t(Msg::NoMatchingFamily)).weak());
+                            } else {
+                                for &i in &fam_matches {
+                                    let fam = &self.chip_families[i];
+                                    let selected = Some(i) == sel_family;
+                                    if ui
+                                        .selectable_label(
+                                            selected,
+                                            format!("{} ({})", fam.name, fam.chips.len()),
+                                        )
+                                        .clicked()
+                                    {
+                                        picked_family = Some(i);
+                                    }
+                                }
+                            }
+                        });
+                },
+            );
+
+            ui.allocate_ui_with_layout(
+                egui::vec2(variant_w, 240.0),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.label(egui::RichText::new(self.t(Msg::Variant)).strong().small());
+                    let fam_index = sel_family;
+                    egui::ScrollArea::vertical()
+                        .id_salt("chip_list")
+                        .max_height(215.0)
+                        .show(ui, |ui| {
+                            match fam_index.and_then(|i| self.chip_families.get(i)) {
+                                Some(fam) => {
+                                    let mut shown = 0;
+                                    for name in &fam.chips {
+                                        if !filter.is_empty()
+                                            && !name.to_lowercase().contains(&filter)
+                                        {
+                                            continue;
+                                        }
+                                        let selected = self.manual_target == *name;
+                                        if ui.selectable_label(selected, name).clicked() {
+                                            picked_chip = Some(name.clone());
+                                        }
+                                        shown += 1;
+                                    }
+                                    if shown == 0 {
+                                        ui.label(
+                                            egui::RichText::new(self.t(Msg::NoMatchingVariant))
+                                                .weak(),
+                                        );
+                                    }
+                                }
+                                None => {
+                                    ui.label(
+                                        egui::RichText::new(self.t(Msg::SelectFamilyFirst)).weak(),
+                                    );
+                                }
+                            }
+                        });
+                },
+            );
         });
+
+        if let Some((bi, first_fam)) = picked_brand {
+            self.selected_brand = Some(bi);
+            self.selected_family = first_fam;
+            if self.manual_target.is_empty() {
+                if let Some(fam) = first_fam.and_then(|i| self.chip_families.get(i)) {
+                    if let Some(first) = fam.chips.first() {
+                        self.manual_target = first.clone();
+                    }
+                }
+            }
+        }
+        if let Some(i) = picked_family {
+            self.selected_family = Some(i);
+            if self.manual_target.is_empty() {
+                if let Some(fam) = self.chip_families.get(i) {
+                    if let Some(first) = fam.chips.first() {
+                        self.manual_target = first.clone();
+                    }
+                }
+            }
+        }
+        if let Some(name) = picked_chip {
+            self.manual_target = name;
+        }
 
         let enabled = !self.probes.is_empty()
             && !self.connecting
@@ -377,7 +389,7 @@ impl ProbeUiApp {
         if ui
             .add_enabled(
                 enabled,
-                egui::Button::new(self.icon("🔗", "按型号连接", "Connect by Model"))
+                egui::Button::new(self.icon("🔗", Msg::ConnectByModel))
                     .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
             )
             .clicked()
@@ -385,10 +397,7 @@ impl ProbeUiApp {
             let target = self.manual_target.trim().to_owned();
             self.connecting = true;
             self.busy = true;
-            self.log_info(self.lang.pick(
-                format!("正在连接 {} ...", target),
-                format!("Connecting to {} ...", target),
-            ));
+            self.log_info(t!(self.lang, Msg::ConnectingTo, target));
             self.send(WorkerCommand::ConnectManual {
                 probe: self.selected_probe,
                 target,
@@ -403,27 +412,15 @@ impl ProbeUiApp {
         ui.separator();
         match &self.connected {
             Some(summary) => {
-                ui.heading(self.t("目标信息", "Target Info"));
-                ui.label(self.lang.pick(
-                    format!("芯片型号: {}", summary.name),
-                    format!("Chip: {}", summary.name),
-                ));
-                ui.label(self.lang.pick(
-                    format!("架构: {}", summary.architecture),
-                    format!("Architecture: {}", summary.architecture),
-                ));
-                ui.label(self.lang.pick(
-                    format!("核心数量: {}", summary.cores.len()),
-                    format!("Cores: {}", summary.cores.len()),
-                ));
+                ui.heading(self.t(Msg::TargetInfo));
+                ui.label(t!(self.lang, Msg::ChipModel, summary.name));
+                ui.label(t!(self.lang, Msg::Arch, summary.architecture));
+                ui.label(t!(self.lang, Msg::CoreCount, summary.cores.len()));
                 for (i, c) in &summary.cores {
-                    ui.label(self.lang.pick(
-                        format!("  核心 {}: {}", i, c),
-                        format!("  Core {}: {}", i, c),
-                    ));
+                    ui.label(t!(self.lang, Msg::Core, i, c));
                 }
                 ui.add_space(4.0);
-                ui.label(egui::RichText::new(self.t("内存映射:", "Memory Map:")).strong());
+                ui.label(egui::RichText::new(self.t(Msg::MemoryMap)).strong());
                 egui::ScrollArea::vertical()
                     .id_salt("mem_scroll")
                     .max_height(220.0)
@@ -440,9 +437,7 @@ impl ProbeUiApp {
                     });
             }
             None => {
-                ui.label(
-                    egui::RichText::new(self.t("尚未连接目标", "Not connected")).weak(),
-                );
+                ui.label(egui::RichText::new(self.t(Msg::TargetNotConnected)).weak());
             }
         }
         let pad = (TARGET_INFO_MIN_H - ui.min_rect().height()).max(0.0);

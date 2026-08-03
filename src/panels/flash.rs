@@ -3,68 +3,52 @@
 use eframe::egui;
 
 use crate::app::ProbeUiApp;
+use crate::i18n::Msg;
+use crate::t;
 use crate::worker::{OpState, WorkerCommand};
 
 impl ProbeUiApp {
     /// 中央固件烧录面板：文件选择、烧录选项、操作按钮、进度与日志。
     pub(crate) fn flash_view_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
-        ui.heading(self.t("固件烧录", "Firmware Flashing"));
+        ui.heading(self.t(Msg::FirmwareFlashing));
         ui.separator();
 
         ui.horizontal(|ui| {
-            ui.label(self.t("固件文件:", "Firmware file:"));
-            let hint = self.t(
-                "选择 .elf / .hex / .bin / .uf2 文件",
-                "Select .elf / .hex / .bin / .uf2 file",
-            );
+            ui.label(self.t(Msg::FirmwareFile));
+            let hint = self.t(Msg::FirmwareHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.file_path)
                     .desired_width(320.0)
                     .hint_text(hint),
             );
-            if ui.button(self.icon("📂", "浏览...", "Browse...")).clicked() {
+            if ui.button(self.icon("📂", Msg::Browse)).clicked() {
                 if let Some(path) = rfd::FileDialog::new()
-                    .add_filter(
-                        self.t("固件镜像", "Firmware image"),
-                        &["elf", "hex", "bin", "uf2"],
-                    )
+                    .add_filter(self.t(Msg::FirmwareImage), &["elf", "hex", "bin", "uf2"])
                     .pick_file()
                 {
                     self.file_path = path.display().to_string();
-                    self.log_info(self.lang.pick(
-                        format!("已选择固件: {}", self.file_path),
-                        format!("Selected firmware: {}", self.file_path),
-                    ));
+                    self.log_info(t!(self.lang, Msg::SelectedFirmware, self.file_path));
                 }
             }
             if ui
-                .button(self.icon("📁", "选择项目文件夹...", "Select Project Folder..."))
+                .button(self.icon("📁", Msg::SelectProjectFolder))
                 .clicked()
             {
                 if let Some(dir) = rfd::FileDialog::new().pick_folder() {
                     self.firmware_root = dir.display().to_string();
                     self.firmware_scanning = true;
                     self.firmware_candidates.clear();
-                    self.log_info(self.lang.pick(
-                        format!("正在扫描项目文件夹并自动识别固件: {}", self.firmware_root),
-                        format!(
-                            "Scanning project folder and auto-detecting firmware: {}",
-                            self.firmware_root
-                        ),
-                    ));
+                    self.log_info(t!(self.lang, Msg::ScanningProject, self.firmware_root));
                     self.send(WorkerCommand::ScanFirmware { root: dir });
                 }
             }
         });
         if let Some(fmt) = self.detected_format() {
-            ui.label(self.lang.pick(
-                format!("文件格式: {}", fmt),
-                format!("File format: {}", fmt),
-            ));
+            ui.label(t!(self.lang, Msg::FileFormat, fmt));
             if fmt == "Binary" {
                 ui.horizontal(|ui| {
-                    ui.label(self.t("基地址:", "Base address:"));
+                    ui.label(self.t(Msg::BaseAddress));
                     ui.add(
                         egui::DragValue::new(&mut self.bin_base)
                             .hexadecimal(8, false, true)
@@ -77,10 +61,7 @@ impl ProbeUiApp {
         if self.firmware_scanning {
             ui.horizontal(|ui| {
                 ui.add(egui::Spinner::new());
-                ui.label(self.lang.pick(
-                    format!("扫描中: {}", self.firmware_root),
-                    format!("Scanning: {}", self.firmware_root),
-                ));
+                ui.label(t!(self.lang, Msg::ScanningRoot, self.firmware_root));
             });
         }
         if self.firmware_candidates.len() > 1 {
@@ -104,7 +85,7 @@ impl ProbeUiApp {
                         .map(|f| f.to_string_lossy().into_owned())
                         .unwrap_or_default();
                     if name.is_empty() {
-                        self.t("未选择项目固件", "No project firmware").to_owned()
+                        self.t(Msg::NoProjectFirmware).to_owned()
                     } else {
                         name
                     }
@@ -112,7 +93,7 @@ impl ProbeUiApp {
             };
             let mut chosen: Option<usize> = None;
             ui.horizontal(|ui| {
-                ui.label(self.t("项目固件:", "Project firmware:"));
+                ui.label(self.t(Msg::ProjectFirmware));
                 egui::ComboBox::from_id_salt("fw_sel")
                     .width(400.0)
                     .selected_text(sel_text)
@@ -129,19 +110,16 @@ impl ProbeUiApp {
             if let Some(i) = chosen {
                 if let Some(c) = self.firmware_candidates.get(i) {
                     self.file_path = c.path.display().to_string();
-                    self.log_info(self.lang.pick(
-                        format!("已选择固件: {}", self.file_path),
-                        format!("Selected firmware: {}", self.file_path),
-                    ));
+                    self.log_info(t!(self.lang, Msg::SelectedFirmware, self.file_path));
                 }
             }
         }
 
         ui.add_space(8.0);
-        let l_erase = self.t("全片擦除后烧录", "Chip erase before flash");
-        let l_verify = self.t("烧录后校验", "Verify after flash");
-        let l_keep = self.t("保留未写入字节", "Keep unwritten bytes");
-        let l_reset = self.t("烧录后复位运行", "Reset and run after flash");
+        let l_erase = self.t(Msg::ChipEraseBeforeFlash);
+        let l_verify = self.t(Msg::VerifyAfterFlash);
+        let l_keep = self.t(Msg::KeepUnwritten);
+        let l_reset = self.t(Msg::ResetAndRun);
         ui.horizontal_wrapped(|ui| {
             ui.checkbox(&mut self.chip_erase, l_erase);
             ui.checkbox(&mut self.verify, l_verify);
@@ -159,7 +137,7 @@ impl ProbeUiApp {
             if ui
                 .add_enabled(
                     can_flash,
-                    egui::Button::new(self.icon("⚡", "开始烧录", "Flash"))
+                    egui::Button::new(self.icon("⚡", Msg::FlashBtn))
                         .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43))
                         .min_size(egui::vec2(130.0, 32.0)),
                 )
@@ -172,33 +150,33 @@ impl ProbeUiApp {
             if ui
                 .add_enabled(
                     can_erase,
-                    egui::Button::new(self.icon("🗑", "全片擦除", "Erase All")),
+                    egui::Button::new(self.icon("🗑", Msg::EraseAllBtn)),
                 )
                 .clicked()
             {
                 self.busy = true;
                 self.op_bars.clear();
-                self.log_info(self.t("开始全片擦除...", "Erasing all flash..."));
+                self.log_info(self.t(Msg::ErasingAll));
                 self.send(WorkerCommand::EraseAll);
             }
             if ui
                 .add_enabled(
                     self.connected.is_some() && !self.busy,
-                    egui::Button::new(self.icon("🔁", "复位目标", "Reset Target")),
+                    egui::Button::new(self.icon("🔁", Msg::ResetTargetBtn)),
                 )
                 .clicked()
             {
                 self.busy = true;
-                self.log_info(self.t("正在复位目标...", "Resetting target..."));
+                self.log_info(self.t(Msg::ResettingTarget));
                 self.send(WorkerCommand::Reset);
             }
         });
 
         ui.add_space(8.0);
         ui.separator();
-        ui.heading(self.t("读取固件", "Read Firmware"));
+        ui.heading(self.t(Msg::ReadFirmwareTitle));
         ui.horizontal(|ui| {
-            ui.label(self.t("范围:", "Range:"));
+            ui.label(self.t(Msg::Range));
             ui.add(
                 egui::DragValue::new(&mut self.read_start)
                     .hexadecimal(8, false, true)
@@ -210,17 +188,14 @@ impl ProbeUiApp {
                     .hexadecimal(8, false, true)
                     .prefix("0x"),
             );
-            ui.label(self.t("字节", "bytes"));
+            ui.label(self.t(Msg::Bytes));
         });
         if self.read_end > self.read_start {
             let size = self.read_end - self.read_start;
             ui.label(
-                egui::RichText::new(self.lang.pick(
-                    format!("大小: {} KB", size / 1024),
-                    format!("Size: {} KB", size / 1024),
-                ))
-                .small()
-                .weak(),
+                egui::RichText::new(t!(self.lang, Msg::SizeKb, size / 1024))
+                    .small()
+                    .weak(),
             );
         }
         let can_read = self.connected.is_some()
@@ -231,7 +206,7 @@ impl ProbeUiApp {
         if ui
             .add_enabled(
                 can_read,
-                egui::Button::new(self.icon("💾", "读取固件...", "Read Firmware..."))
+                egui::Button::new(self.icon("💾", Msg::ReadFirmwareBtn))
                     .fill(egui::Color32::from_rgb(0x8a, 0x6d, 0x3b)),
             )
             .clicked()
@@ -245,10 +220,7 @@ impl ProbeUiApp {
                 let end = self.read_end;
                 self.busy = true;
                 self.op_bars.clear();
-                self.log_info(self.lang.pick(
-                    format!("开始读取: 0x{start:X} - 0x{end:X}"),
-                    format!("Starting read: 0x{start:X} - 0x{end:X}"),
-                ));
+                self.log_info(t!(self.lang, Msg::StartingRead, start, end));
                 self.send(WorkerCommand::ReadFlash { path, start, end });
             }
         }

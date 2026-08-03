@@ -8,4 +8,5 @@ mod flash;
 mod log;
 mod mem_panel;
 mod rtt_panel;
+mod target_gen;
 mod top;

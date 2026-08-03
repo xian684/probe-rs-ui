@@ -12,6 +12,7 @@
 - 🎯 **目标自动识别**：支持自动识别芯片型号（ST-Link / J-Link 等可自报型号的探针）。
 - 🔌 **连接方式可选**：支持「正常连接」与「复位期间连接」（Under Reset），对应 STM32 BOOT0/BOOT1 启动配置，便于在目标程序干扰 SWD 或需从系统存储器启动时连接。
 - 🧩 **手动指定芯片**：内置 probe-rs 全部芯片型号库，按品牌 → 系列 → 具体型号三级联动选择，支持关键字实时搜索（适用于 DAPLink / CMSIS-DAP 等无法自动识别的探针）。
+- 📦 **外部芯片描述**：支持直接选择 CMSIS 包（`.pack` / `.pdsc`）由内置的 [target-gen](https://probe.rs/docs/tools/target-gen/) 库解析生成芯片描述，或加载现成的 YAML 描述文件；外部芯片会自动纳入手动选型列表并可连接。
 - 📁 **固件自动定位**：选择项目文件夹后自动扫描常见构建产物（cargo `target/`、Keil `Objects/`、CubeIDE `Debug/`、CMake `build/` 等），自动选中最佳固件，多候选可下拉切换。
 - ⚡ **固件烧录**：支持 `.elf` / `.axf` / `.hex` / `.bin` / `.uf2` 格式，并可识别无扩展名的 Rust ELF 编译产物。
 - ⚙️ **可配置烧录选项**：全片擦除、烧录后校验、保留未写入字节、烧录后复位运行。
@@ -36,9 +37,9 @@ cargo build --release
 
 生成的可执行文件位于 `target/release/probe-rs-ui`（Windows 为 `probe-rs-ui.exe`），可直接双击运行。
 
-### Linux / macOS 构建包
+### Windows 构建包
 
-推送至 `master` 后，GitHub Actions 会自动生成 Linux x86_64、macOS Intel 和 macOS Apple Silicon 的 `.tar.gz` 包。构建完成后可在仓库的 [Actions](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml) 页面下载对应运行的 artifacts。
+推送至 `master` 后，GitHub Actions 会自动构建 Windows x86_64 的 `.zip` 包（可在 [Actions](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml) 页面下载 artifacts）。推送形如 `v1.0.0` 的 tag 时，还会自动创建 GitHub Release 并附带该 zip。
 
 ## 使用方法
 

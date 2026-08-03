@@ -3,13 +3,14 @@
 use eframe::egui;
 
 use crate::app::ProbeUiApp;
+use crate::i18n::Msg;
 
 impl ProbeUiApp {
     /// 内存查看器视图（在中央面板中由『内存查看器』标签切换显示）。
     pub(crate) fn mem_view_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.heading(self.t("内存查看器", "Memory Viewer"));
+            ui.heading(self.t(Msg::MemoryViewer));
             if self.mem_busy {
                 ui.add(egui::Spinner::new());
             }
@@ -37,10 +38,10 @@ impl ProbeUiApp {
             .iter()
             .find(|(_, s, e)| self.mem_start >= *s && self.mem_start < *e)
             .map(|(l, _, _)| l.clone())
-            .unwrap_or_else(|| self.t("自定义地址", "Custom address").to_owned());
+            .unwrap_or_else(|| self.t(Msg::CustomAddress).to_owned());
         let mut picked: Option<(u64, u64)> = None;
         ui.horizontal(|ui| {
-            ui.label(self.t("区域:", "Region:"));
+            ui.label(self.t(Msg::Region));
             egui::ComboBox::from_id_salt("mem_region_sel")
                 .width(320.0)
                 .selected_text(sel_text)
@@ -61,19 +62,19 @@ impl ProbeUiApp {
         }
 
         ui.horizontal(|ui| {
-            ui.label(self.t("地址:", "Address:"));
+            ui.label(self.t(Msg::Address));
             ui.add(
                 egui::DragValue::new(&mut self.mem_start)
                     .hexadecimal(8, false, true)
                     .prefix("0x"),
             );
-            ui.label(self.t("字节数:", "Bytes:"));
+            ui.label(self.t(Msg::BytesCount));
             ui.add(egui::DragValue::new(&mut self.mem_len).range(1..=262_144));
             let can_read = self.connected.is_some() && !self.mem_busy && !self.busy;
             if ui
                 .add_enabled(
                     can_read,
-                    egui::Button::new(self.icon("📖", "读取", "Read"))
+                    egui::Button::new(self.icon("📖", Msg::ReadBtn))
                         .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                 )
                 .clicked()
@@ -91,13 +92,7 @@ impl ProbeUiApp {
             .max_height(dump_h)
             .show(ui, |ui| {
                 if self.mem_data.is_empty() {
-                    ui.label(
-                        egui::RichText::new(self.t(
-                            "尚未读取，点击上方『读取』",
-                            "Not read yet; click 'Read' above",
-                        ))
-                        .weak(),
-                    );
+                    ui.label(egui::RichText::new(self.t(Msg::NotReadYet)).weak());
                 } else {
                     let base = self.mem_read_addr;
                     for (li, row) in self.mem_data.chunks(16).enumerate() {
@@ -119,9 +114,9 @@ impl ProbeUiApp {
 
         ui.add_space(8.0);
         ui.separator();
-        ui.label(egui::RichText::new(self.t("写入内存", "Write Memory")).strong());
+        ui.label(egui::RichText::new(self.t(Msg::WriteMemory)).strong());
         ui.horizontal(|ui| {
-            ui.label(self.t("地址:", "Address:"));
+            ui.label(self.t(Msg::Address));
             ui.add(
                 egui::DragValue::new(&mut self.mem_write_start)
                     .hexadecimal(8, false, true)
@@ -129,11 +124,8 @@ impl ProbeUiApp {
             );
         });
         ui.horizontal(|ui| {
-            ui.label(self.t("数据:", "Data:"));
-            let hint = self.t(
-                "十六进制字节，如 DE AD BE EF",
-                "Hex bytes, e.g. DE AD BE EF",
-            );
+            ui.label(self.t(Msg::Data));
+            let hint = self.t(Msg::HexHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.mem_write_input)
                     .desired_width(240.0)
@@ -143,7 +135,7 @@ impl ProbeUiApp {
             if ui
                 .add_enabled(
                     can_write,
-                    egui::Button::new(self.icon("✍", "写入", "Write"))
+                    egui::Button::new(self.icon("✍", Msg::WriteBtn))
                         .fill(egui::Color32::from_rgb(0x8a, 0x6d, 0x3b)),
                 )
                 .clicked()

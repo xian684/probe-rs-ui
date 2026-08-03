@@ -3,25 +3,26 @@
 use eframe::egui;
 
 use crate::app::ProbeUiApp;
+use crate::i18n::Msg;
 use crate::worker::WorkerCommand;
 
 impl ProbeUiApp {
     /// RTT 日志视图（在中央面板中由『RTT 日志』标签切换显示）。
     pub(crate) fn rtt_view_ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
-        ui.heading(self.t("RTT 日志", "RTT Log"));
+        ui.heading(self.t(Msg::RttLog));
         ui.separator();
 
         ui.horizontal(|ui| {
             if self.rtt_on {
-                if ui.button(self.icon("⏹", "停止", "Stop")).clicked() {
+                if ui.button(self.icon("⏹", Msg::StopBtn)).clicked() {
                     self.rtt_on = false;
                     self.send(WorkerCommand::RttStop);
-                    self.log_info(self.t("正在停止 RTT...", "Stopping RTT..."));
+                    self.log_info(self.t(Msg::StoppingRtt));
                 }
                 ui.colored_label(
                     egui::Color32::from_rgb(0x2e, 0xa0, 0x43),
-                    self.t("● 运行中", "● Running"),
+                    self.t(Msg::RttRunning),
                 );
             } else {
                 let can_start =
@@ -29,35 +30,32 @@ impl ProbeUiApp {
                 if ui
                     .add_enabled(
                         can_start,
-                        egui::Button::new(self.icon("▶", "启动", "Start"))
+                        egui::Button::new(self.icon("▶", Msg::StartBtn))
                             .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
                     )
                     .clicked()
                 {
                     self.rtt_on = true;
                     self.send(WorkerCommand::RttStart);
-                    self.log_info(self.t(
-                        "正在启动 RTT（在目标 RAM 中扫描控制块）...",
-                        "Starting RTT (scanning target RAM for the control block)...",
-                    ));
+                    self.log_info(self.t(Msg::StartingRtt));
                 }
             }
-            if ui.button(self.icon("🗑", "清空", "Clear")).clicked() {
+            if ui.button(self.icon("🗑", Msg::Clear)).clicked() {
                 self.rtt_buf.clear();
             }
-            let l_auto = self.t("自动滚动", "Auto-scroll");
+            let l_auto = self.t(Msg::AutoScroll);
             ui.checkbox(&mut self.rtt_autoscroll, l_auto);
             ui.separator();
-            ui.label(self.t("显示通道:", "Show channel:"));
+            ui.label(self.t(Msg::ShowChannel));
             let sel_view = match self.rtt_view_channel {
                 Some(c) => format!("CH{c}"),
-                None => self.t("全部", "All").to_owned(),
+                None => self.t(Msg::All).to_owned(),
             };
             egui::ComboBox::from_id_salt("rtt_view_ch")
                 .width(80.0)
                 .selected_text(sel_view)
                 .show_ui(ui, |ui| {
-                    let l_all = self.t("全部", "All");
+                    let l_all = self.t(Msg::All);
                     if ui
                         .selectable_label(self.rtt_view_channel.is_none(), l_all)
                         .clicked()
@@ -74,7 +72,7 @@ impl ProbeUiApp {
                     }
                 });
             ui.separator();
-            ui.label(self.t("发送通道:", "Send channel:"));
+            ui.label(self.t(Msg::SendChannel));
             egui::ComboBox::from_id_salt("rtt_send_ch")
                 .width(70.0)
                 .selected_text(format!("CH{}", self.rtt_send_channel))
@@ -97,11 +95,8 @@ impl ProbeUiApp {
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             let ch = self.rtt_send_channel;
-            ui.label(format!("{} (CH{}):", self.t("发送", "Send"), ch));
-            let hint = self.t(
-                "输入内容后回车或点击发送，写入目标下行通道",
-                "Type and press Enter or click Send to write to a down channel",
-            );
+            ui.label(format!("{} (CH{}):", self.t(Msg::Send), ch));
+            let hint = self.t(Msg::SendHint);
             let edit = ui.add(
                 egui::TextEdit::singleline(&mut self.rtt_down_input)
                     .desired_width(360.0)
@@ -109,10 +104,7 @@ impl ProbeUiApp {
             );
             let send_enabled = self.rtt_on && !self.rtt_down_input.trim().is_empty();
             let send_clicked = ui
-                .add_enabled(
-                    send_enabled,
-                    egui::Button::new(self.icon("📤", "发送", "Send")),
-                )
+                .add_enabled(send_enabled, egui::Button::new(self.icon("📤", Msg::Send)))
                 .clicked();
             let enter =
                 edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) && send_enabled;

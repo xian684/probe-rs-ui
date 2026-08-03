@@ -7,9 +7,11 @@ use eframe::egui;
 use crate::chips::{ChipBrandInfo, ChipFamilyInfo};
 use crate::config::{self, AppConfig};
 use crate::firmware::FirmwareCandidate;
-use crate::i18n::Lang;
+use crate::i18n::{Lang, Msg};
+use crate::t;
 use crate::worker::{
-    self, BootMode, OpState, ProbeInfo, TargetSummary, WorkerCommand, WorkerEvent,
+    self, BootMode, ChipFileInfo, OpState, ProbeInfo, TargetGenResult, TargetSummary,
+    WorkerCommand, WorkerEvent,
 };
 
 /// 左栏『目标信息』框与中央底部日志框对齐时的最小高度。
@@ -38,6 +40,7 @@ pub(crate) enum CentralTab {
     Flash,
     Memory,
     Rtt,
+    TargetGen,
 }
 
 pub(crate) struct LogEntry {
@@ -111,6 +114,13 @@ pub struct ProbeUiApp {
     pub(crate) mem_write_start: u64,
     pub(crate) mem_write_input: String,
 
+    // ---- Target 生成器 ----
+    pub(crate) tg_input: String,
+    pub(crate) tg_output_dir: String,
+    pub(crate) tg_only_supported: bool,
+    pub(crate) tg_busy: bool,
+    pub(crate) tg_result: Option<TargetGenResult>,
+
     last_save: Instant,
     win_size: Option<[f32; 2]>,
     win_pos: Option<[f32; 2]>,
@@ -173,6 +183,11 @@ impl ProbeUiApp {
             mem_busy: false,
             mem_write_start: 0,
             mem_write_input: String::new(),
+            tg_input: String::new(),
+            tg_output_dir: String::new(),
+            tg_only_supported: false,
+            tg_busy: false,
+            tg_result: None,
             last_save: Instant::now(),
             win_size: saved.window_size,
             win_pos: saved.window_pos,
@@ -181,25 +196,15 @@ impl ProbeUiApp {
         };
         app.apply_config(saved);
         app.log(
-            app.lang.pick(
-                format!(
-                    "已加载 {} 个内置芯片系列（{} 个品牌），可手动指定目标",
-                    app.chip_families.len(),
-                    app.chip_brands.len()
-                ),
-                format!(
-                    "Loaded {} built-in chip families ({} brands); manual target selection is available",
-                    app.chip_families.len(),
-                    app.chip_brands.len()
-                ),
+            t!(
+                app.lang,
+                Msg::LoadedChips,
+                app.chip_families.len(),
+                app.chip_brands.len()
             ),
             LogLevel::Info,
         );
-        app.log(
-            app.lang
-                .pick("正在扫描调试探针...", "Scanning debug probes..."),
-            LogLevel::Info,
-        );
+        app.log(app.lang.tr(Msg::ScanningDebugProbes), LogLevel::Info);
         app.send(WorkerCommand::Scan);
         app
     }
@@ -208,21 +213,21 @@ impl ProbeUiApp {
         let _ = self.to_worker.send(cmd);
     }
 
-    pub(crate) fn t(&self, zh: &'static str, en: &'static str) -> &'static str {
-        self.lang.pick(zh, en)
+    pub(crate) fn t(&self, msg: Msg) -> &'static str {
+        self.lang.tr(msg)
     }
 
     /// 图标 + 本地化文本。
-    pub(crate) fn icon(&self, emoji: &str, zh: &'static str, en: &'static str) -> String {
-        format!("{emoji} {}", self.t(zh, en))
+    pub(crate) fn icon(&self, emoji: &str, msg: Msg) -> String {
+        format!("{emoji} {}", self.t(msg))
     }
 
     /// 品牌名本地化（其余品牌名为专有名词，直接显示）。
     pub(crate) fn brand_label(&self, brand: &str) -> String {
         match brand {
-            "Other" => self.t("其他", "Other").to_owned(),
-            "ARM" => self.t("ARM 通用", "ARM Generic").to_owned(),
-            "RISC-V" => self.t("RISC-V 通用", "RISC-V Generic").to_owned(),
+            "Other" => self.t(Msg::BrandOther).to_owned(),
+            "ARM" => self.t(Msg::BrandArm).to_owned(),
+            "RISC-V" => self.t(Msg::BrandRiscv).to_owned(),
             _ => brand.to_owned(),
         }
     }
@@ -282,11 +287,14 @@ impl ProbeUiApp {
         self.central_tab = match cfg.central_tab.as_str() {
             "memory" => CentralTab::Memory,
             "rtt" => CentralTab::Rtt,
+            "target_gen" => CentralTab::TargetGen,
             _ => CentralTab::Flash,
         };
         self.mem_start = cfg.mem_start;
         self.mem_len = cfg.mem_len;
         self.mem_write_start = cfg.mem_write_start;
+        self.tg_input = cfg.tg_input;
+        self.tg_output_dir = cfg.tg_output_dir;
         self.send(WorkerCommand::SetLang(self.lang));
         if !self.firmware_root.trim().is_empty() {
             self.firmware_scanning = true;
@@ -338,11 +346,14 @@ impl ProbeUiApp {
                 CentralTab::Flash => "flash",
                 CentralTab::Memory => "memory",
                 CentralTab::Rtt => "rtt",
+                CentralTab::TargetGen => "target_gen",
             }
             .into(),
             mem_start: self.mem_start,
             mem_len: self.mem_len,
             mem_write_start: self.mem_write_start,
+            tg_input: self.tg_input.clone(),
+            tg_output_dir: self.tg_output_dir.clone(),
             window_size: self.win_size,
             window_pos: self.win_pos,
         }
@@ -374,6 +385,17 @@ impl ProbeUiApp {
         self.log(text, LogLevel::Error);
     }
 
+    /// 将外部加载的芯片族合并进手动选型列表（品牌归入『外部芯片包』）。
+    fn merge_chip_file(&mut self, info: ChipFileInfo) {
+        let family = ChipFamilyInfo {
+            name: info.family_name,
+            brand: self.t(Msg::BrandExternal).to_owned(),
+            chips: info.chips,
+        };
+        self.chip_families.push(family);
+        self.chip_brands = crate::chips::group_brands(&self.chip_families);
+    }
+
     fn handle_event(&mut self, ev: WorkerEvent) {
         match ev {
             WorkerEvent::Probes(Ok(list)) => {
@@ -383,15 +405,9 @@ impl ProbeUiApp {
                     self.selected_probe = 0;
                 }
                 if self.probes.is_empty() {
-                    self.log_warn(self.t(
-                        "未检测到任何调试探针，请检查 USB 连接与驱动",
-                        "No debug probes detected. Check USB connection and drivers",
-                    ));
+                    self.log_warn(self.t(Msg::NoProbes));
                 } else {
-                    self.log_ok(self.lang.pick(
-                        format!("检测到 {} 个调试探针", self.probes.len()),
-                        format!("Detected {} debug probe(s)", self.probes.len()),
-                    ));
+                    self.log_ok(t!(self.lang, Msg::DetectedProbes, self.probes.len()));
                 }
             }
             WorkerEvent::Probes(Err(e)) => {
@@ -401,10 +417,7 @@ impl ProbeUiApp {
             WorkerEvent::Connected(Ok(summary)) => {
                 self.connecting = false;
                 self.busy = false;
-                self.log_ok(self.lang.pick(
-                    format!("已连接目标: {}", summary.name),
-                    format!("Connected to target: {}", summary.name),
-                ));
+                self.log_ok(t!(self.lang, Msg::ConnectedTo, summary.name));
                 self.connected = Some(summary);
                 if let Some(flash) = self
                     .connected
@@ -461,7 +474,7 @@ impl ProbeUiApp {
             }
             WorkerEvent::OperationDone(Ok(())) => {
                 self.busy = false;
-                self.log_ok(self.t("操作成功完成", "Operation completed successfully"));
+                self.log_ok(self.t(Msg::OperationCompleted));
             }
             WorkerEvent::OperationDone(Err(e)) => {
                 self.busy = false;
@@ -476,35 +489,56 @@ impl ProbeUiApp {
                 self.firmware_root = root.clone();
                 self.firmware_candidates = candidates;
                 if self.firmware_candidates.is_empty() {
-                    self.log_warn(self.lang.pick(
-                        format!("在 {} 中未找到固件文件 (.elf / .hex / .bin / .uf2)", root),
-                        format!(
-                            "No firmware file (.elf / .hex / .bin / .uf2) found in {}",
-                            root
-                        ),
-                    ));
+                    self.log_warn(t!(self.lang, Msg::NoFirmwareFound, root));
                 } else if let Some(i) = best {
                     let path = self.firmware_candidates[i].path.display().to_string();
                     self.file_path = path.clone();
-                    self.log_ok(self.lang.pick(
-                        format!(
-                            "自动识别到固件: {}（共 {} 个候选）",
-                            path,
-                            self.firmware_candidates.len()
-                        ),
-                        format!(
-                            "Auto-detected firmware: {} ({} candidate(s))",
-                            path,
-                            self.firmware_candidates.len()
-                        ),
+                    self.log_ok(t!(
+                        self.lang,
+                        Msg::AutoDetectedFirmware,
+                        path,
+                        self.firmware_candidates.len()
                     ));
                     if self.firmware_candidates.len() > 1 {
-                        self.log_info(self.t(
-                            "如需使用其它固件，请在下方下拉列表中选择",
-                            "To use another firmware, pick one from the dropdown below",
-                        ));
+                        self.log_info(self.t(Msg::UseOtherFirmware));
                     }
                 }
+            }
+            WorkerEvent::ChipFileLoaded(Ok(info)) => {
+                let n = info.chips.len();
+                let name = info.family_name.clone();
+                self.merge_chip_file(info);
+                self.log_ok(t!(self.lang, Msg::ChipFileLoaded, name, n));
+            }
+            WorkerEvent::ChipFileLoaded(Err(e)) => {
+                self.log_err(e);
+            }
+            WorkerEvent::PackGenerated(Ok(infos)) => {
+                let n = infos.len();
+                for info in infos {
+                    self.merge_chip_file(info);
+                }
+                self.log_ok(t!(self.lang, Msg::PackGenerated, n));
+            }
+            WorkerEvent::PackGenerated(Err(e)) => {
+                self.log_err(e);
+            }
+            WorkerEvent::TargetGenDone(Ok(result)) => {
+                self.tg_busy = false;
+                self.tg_result = Some(result.clone());
+                self.log_ok(t!(self.lang, Msg::TargetsGenerated, result.families.len()));
+                for family in &result.families {
+                    self.log_info(t!(
+                        self.lang,
+                        Msg::TargetFileWritten,
+                        family.output_file,
+                        family.variant_count
+                    ));
+                }
+            }
+            WorkerEvent::TargetGenDone(Err(e)) => {
+                self.tg_busy = false;
+                self.log_err(e);
             }
             WorkerEvent::RttData { channel, data } => {
                 let text = String::from_utf8_lossy(&data);
@@ -538,9 +572,11 @@ impl ProbeUiApp {
                 if self.rtt_send_channel >= down_channels.max(1) {
                     self.rtt_send_channel = 0;
                 }
-                self.log_ok(self.lang.pick(
-                    format!("RTT 已启动（上行 {up_channels}，下行 {down_channels}）"),
-                    format!("RTT started ({} up, {} down)", up_channels, down_channels),
+                self.log_ok(t!(
+                    self.lang,
+                    Msg::RttStartedSummary,
+                    up_channels,
+                    down_channels
                 ));
             }
             WorkerEvent::RttStopped => {
@@ -550,10 +586,7 @@ impl ProbeUiApp {
                 self.mem_busy = false;
                 self.mem_read_addr = self.mem_start;
                 self.mem_data = data;
-                self.log_ok(self.lang.pick(
-                    format!("读取内存完成: {} 字节", self.mem_data.len()),
-                    format!("Memory read: {} bytes", self.mem_data.len()),
-                ));
+                self.log_ok(t!(self.lang, Msg::MemoryReadDone, self.mem_data.len()));
             }
             WorkerEvent::MemoryRead(Err(e)) => {
                 self.mem_busy = false;
@@ -563,7 +596,7 @@ impl ProbeUiApp {
             WorkerEvent::MemoryWrite(result) => {
                 self.mem_busy = false;
                 match result {
-                    Ok(()) => self.log_ok(self.t("内存写入完成", "Memory written")),
+                    Ok(()) => self.log_ok(self.t(Msg::MemoryWritten)),
                     Err(e) => self.log_err(e),
                 }
             }
@@ -598,18 +631,12 @@ impl ProbeUiApp {
 
     pub(crate) fn flash_file(&mut self, path: PathBuf, bin_base: u64) {
         if self.detected_format_of(&path).is_none() {
-            self.log_err(self.t(
-                "不支持的文件格式，请选择 .elf / .hex / .bin / .uf2 文件",
-                "Unsupported file format. Choose a .elf / .hex / .bin / .uf2 file",
-            ));
+            self.log_err(self.t(Msg::UnsupportedFormat));
             return;
         }
         self.busy = true;
         self.op_bars.clear();
-        self.log_info(self.lang.pick(
-            format!("开始烧录: {}", path.display()),
-            format!("Flashing: {}", path.display()),
-        ));
+        self.log_info(t!(self.lang, Msg::FlashingPath, path.display()));
         self.send(WorkerCommand::Flash {
             path,
             do_chip_erase: self.chip_erase,
@@ -622,46 +649,39 @@ impl ProbeUiApp {
 
     pub(crate) fn read_memory(&mut self) {
         if self.connected.is_none() {
-            self.log_warn(self.t("请先连接目标芯片", "Connect to a target first"));
+            self.log_warn(self.t(Msg::ConnectFirst));
             return;
         }
         let len = self.mem_len.clamp(1, 256 * 1024);
         if len != self.mem_len {
-            self.log_warn(self.lang.pick(
-                format!("读取长度已限制为 {len} 字节"),
-                format!("Read length clamped to {len} bytes"),
-            ));
+            self.log_warn(t!(self.lang, Msg::ReadLenClamped, len));
             self.mem_len = len;
         }
         let start = self.mem_start;
         self.mem_busy = true;
-        self.log_info(self.lang.pick(
-            format!("正在读取内存: 0x{start:X}，{len} 字节"),
-            format!("Reading memory: 0x{start:X}, {len} bytes"),
-        ));
+        self.log_info(t!(self.lang, Msg::ReadingMemory, start, len));
         self.send(WorkerCommand::MemoryRead { start, len });
     }
 
     pub(crate) fn write_memory(&mut self) {
         let Some(bytes) = parse_hex_bytes(&self.mem_write_input) else {
-            self.log_err(self.t(
-                "数据格式错误：请输入十六进制字节（如 DE AD BE EF）",
-                "Invalid data: enter hex bytes (e.g. DE AD BE EF)",
-            ));
+            self.log_err(self.t(Msg::InvalidHexData));
             return;
         };
         if bytes.is_empty() {
             return;
         }
         if self.connected.is_none() {
-            self.log_warn(self.t("请先连接目标芯片", "Connect to a target first"));
+            self.log_warn(self.t(Msg::ConnectFirst));
             return;
         }
         let start = self.mem_write_start;
         self.mem_busy = true;
-        self.log_info(self.lang.pick(
-            format!("正在写入内存: 0x{start:X}，{} 字节", bytes.len()),
-            format!("Writing memory: 0x{start:X}, {} bytes", bytes.len()),
+        self.log_info(t!(
+            self.lang,
+            Msg::WritingMemory,
+            format!("{start:X}"),
+            bytes.len()
         ));
         self.send(WorkerCommand::MemoryWrite { start, data: bytes });
     }
@@ -670,7 +690,7 @@ impl ProbeUiApp {
 /// 将形如 "DE AD BE EF" 或 "DEADBEEF" 的十六进制字符串解析为字节序列。
 fn parse_hex_bytes(s: &str) -> Option<Vec<u8>> {
     let compact: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if compact.is_empty() || compact.len() % 2 != 0 {
+    if compact.is_empty() || !compact.len().is_multiple_of(2) {
         return None;
     }
     let mut out = Vec::with_capacity(compact.len() / 2);
@@ -731,7 +751,8 @@ impl eframe::App for ProbeUiApp {
             config::save(&self.collect_config(ctx));
         }
 
-        if self.probing || self.connecting || self.busy || self.rtt_on || self.mem_busy {
+        if self.probing || self.connecting || self.busy || self.rtt_on || self.mem_busy || self.tg_busy
+        {
             ctx.request_repaint_after(Duration::from_millis(40));
         }
 

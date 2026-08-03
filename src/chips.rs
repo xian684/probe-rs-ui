@@ -78,7 +78,8 @@ fn family_brand(f: &probe_rs::config::ChipFamily) -> String {
     "Other".to_owned()
 }
 
-/// 系列名前缀 -> 品牌。必须按前缀长度从长到短排列。
+/// 系列名前缀 -> 品牌。重叠前缀必须保证更长的在前（starts_with 先命中长前缀），
+/// 不重叠的前缀顺序无要求。
 const BRAND_RULES: &[(&str, &str)] = &[
     ("Generic RISC-V", "RISC-V"),
     ("Generic ARMv", "ARM"),
@@ -94,7 +95,6 @@ const BRAND_RULES: &[(&str, &str)] = &[
     ("MSPM0", "TI"),
     ("MAX326", "Maxim"),
     ("MAX780", "Maxim"),
-    ("MAX326", "Maxim"),
     ("MAX32", "Maxim"),
     ("MAX78", "Maxim"),
     ("MAX7", "Maxim"),
@@ -224,5 +224,20 @@ mod tests {
         assert_eq!(brand_of("GD32F1x0"), Some("GigaDevice"));
         assert_eq!(brand_of("SAM3U"), Some("Microchip"));
         assert_eq!(brand_of("Generic ARMv8-M"), Some("ARM"));
+    }
+
+    #[test]
+    fn brand_rules_overlapping_prefixes_are_ordered() {
+        // 前缀按 starts_with 匹配：若短前缀 A 排在长前缀 B 之前且 B.starts_with(A)，
+        // B 会被 A 错误命中。因此任何重叠前缀必须保证更长的在前；同时不允许重复项。
+        let mut seen: Vec<&str> = Vec::new();
+        for (prefix, _) in BRAND_RULES {
+            assert!(
+                !seen.iter().any(|q| prefix.starts_with(q)),
+                "BRAND_RULES 短前缀必须排在长前缀之后: {prefix}"
+            );
+            assert!(!seen.contains(prefix), "BRAND_RULES 存在重复前缀: {prefix}");
+            seen.push(prefix);
+        }
     }
 }
