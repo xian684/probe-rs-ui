@@ -25,6 +25,8 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 # 供 target-gen 的 ARM 索引拉取 / 在线生成（async）使用。
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+# ARM 在线索引 .pack 下载。
+reqwest = { version = "0.12", default-features = false, features = ["blocking"] }
 
 [build-dependencies]
 winresource = "0.1"

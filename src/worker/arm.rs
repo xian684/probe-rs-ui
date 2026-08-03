@@ -21,6 +21,13 @@ pub(super) fn search_packs(keyword: &str, lang: Lang) -> Result<Vec<ArmPackInfo>
         .into_iter()
         .filter(|p| kw.is_empty() || p.name.to_lowercase().contains(&kw))
         .map(|p| ArmPackInfo {
+            url: format!(
+                "{}/{}.{}.{}.pack",
+                p.url.trim_end_matches('/'),
+                p.vendor,
+                p.name,
+                p.version
+            ),
             vendor: p.vendor,
             name: p.name,
             version: p.version,
@@ -29,6 +36,33 @@ pub(super) fn search_packs(keyword: &str, lang: Lang) -> Result<Vec<ArmPackInfo>
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
+}
+
+/// 仅下载 .pack 文件到输出目录，返回落盘路径。
+pub(super) fn download_pack(
+    url: &str,
+    output_dir: &Path,
+    lang: Lang,
+) -> Result<String, String> {
+    if !output_dir.exists() {
+        std::fs::create_dir_all(output_dir)
+            .map_err(|e| t!(lang, Msg::CreateFileFailed, e))?;
+    }
+    // 从 URL 提取文件名（{vendor}.{name}.{version}.pack）。
+    let file_name = url
+        .rsplit('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("download.pack");
+    let path = output_dir.join(file_name);
+
+    let bytes = reqwest::blocking::get(url)
+        .map_err(|e| t!(lang, Msg::ArmDownloadFailed, e))?
+        .bytes()
+        .map_err(|e| t!(lang, Msg::ArmDownloadFailed, e))?;
+
+    std::fs::write(&path, bytes).map_err(|e| t!(lang, Msg::WriteFileFailed, e))?;
+    Ok(path.display().to_string())
 }
 
 /// 从 ARM 索引下载匹配关键字的 Pack，生成 target 定义并（可选）注册。

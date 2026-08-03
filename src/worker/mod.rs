@@ -78,6 +78,8 @@ pub struct ArmPackInfo {
     pub version: String,
     /// 是否已废弃（deprecated）。
     pub deprecated: bool,
+    /// 完整下载 URL（.pack 文件）。
+    pub url: String,
 }
 
 /// 进度条状态。
@@ -159,6 +161,13 @@ pub enum WorkerCommand {
         /// 生成后是否加载到 registry（供手动选型/自动连接）。
         auto_load: bool,
     },
+    /// 仅下载 .pack 文件到输出目录（不解析、不生成）。
+    ArmDownload {
+        /// 完整下载 URL（.pack 文件）。
+        url: String,
+        /// 输出目录：.pack 文件写入这里。
+        output_dir: PathBuf,
+    },
     TargetGenGenerate {
         /// 输入：.pack 文件或解压后的目录。
         input: PathBuf,
@@ -201,6 +210,7 @@ pub enum WorkerEvent {
     TargetGenDone(Result<TargetGenResult, String>),
     ArmSearchDone(Result<Vec<ArmPackInfo>, String>),
     ArmGenerateDone(Result<TargetGenResult, String>),
+    ArmDownloadDone(Result<String, String>),
     RttData {
         channel: usize,
         data: Vec<u8>,

@@ -109,33 +109,71 @@ impl ProbeUiApp {
                 self.arm_selected = Some(i);
             }
 
-            // 下载并生成：选中 Pack 后启用，生成后自动导入外部芯片包。
+            // 选中 Pack 后的三个操作：下载 / 下载并添加 / 下载并生成。
             let sel_name: String = self
                 .arm_selected
                 .and_then(|i| self.arm_packs.get(i))
                 .map(|p| p.name.clone())
                 .unwrap_or_default();
-            let can_gen = !self.arm_busy && !sel_name.is_empty();
+            let sel_url: String = self
+                .arm_selected
+                .and_then(|i| self.arm_packs.get(i))
+                .map(|p| p.url.clone())
+                .unwrap_or_default();
+            let can_act = !self.arm_busy && !sel_name.is_empty();
             ui.add_space(4.0);
-            ui.horizontal(|ui| {
+            // horizontal_wrapped：按钮组超宽时整体折行，三个按钮保持并排。
+            ui.horizontal_wrapped(|ui| {
                 if ui
                     .add_enabled(
-                        can_gen,
-                        egui::Button::new(self.icon("⬇", Msg::ArmGenerateBtn))
-                            .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43))
-                            .min_size(egui::vec2(130.0, 28.0)),
+                        can_act,
+                        egui::Button::new(self.icon("⬇", Msg::ArmDownloadBtn)),
                     )
                     .clicked()
                 {
-                    let filter = sel_name.clone();
                     let output_dir = PathBuf::from(self.tg_output_dir.trim());
                     self.arm_busy = true;
-                    self.log_info(t!(self.lang, Msg::ArmDownloading, filter));
+                    self.log_info(t!(self.lang, Msg::ArmDownloading, sel_name));
+                    self.send(WorkerCommand::ArmDownload {
+                        url: sel_url.clone(),
+                        output_dir,
+                    });
+                }
+                if ui
+                    .add_enabled(
+                        can_act,
+                        egui::Button::new(self.icon("➕", Msg::ArmGenerateImportBtn)),
+                    )
+                    .clicked()
+                {
+                    // 下载并添加：生成后注册进外部芯片包（不落盘 YAML）。
+                    let output_dir = PathBuf::new();
+                    self.arm_busy = true;
+                    self.log_info(t!(self.lang, Msg::ArmDownloading, sel_name));
                     self.send(WorkerCommand::ArmGenerate {
-                        filter,
+                        filter: sel_name.clone(),
                         output_dir,
                         only_supported: self.tg_only_supported,
                         auto_load: true,
+                    });
+                }
+                if ui
+                    .add_enabled(
+                        can_act,
+                        egui::Button::new(self.icon("⚙️", Msg::ArmGenerateBtn))
+                            .fill(egui::Color32::from_rgb(0x2e, 0xa0, 0x43)),
+                    )
+                    .clicked()
+                {
+                    // 下载并生成：生成 YAML 落盘到输出目录（不自动导入）。
+                    let output_dir = PathBuf::from(self.tg_output_dir.trim());
+                    self.arm_busy = true;
+                    self.log_info(t!(self.lang, Msg::ArmDownloading, sel_name));
+                    self.send(WorkerCommand::ArmGenerate {
+                        filter: sel_name.clone(),
+                        output_dir,
+                        only_supported: self.tg_only_supported,
+                        auto_load: false,
                     });
                 }
                 if !sel_name.is_empty() {

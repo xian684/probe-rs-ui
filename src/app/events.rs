@@ -234,6 +234,14 @@ impl ProbeUiApp {
                 self.arm_busy = false;
                 self.log_err(e);
             }
+            WorkerEvent::ArmDownloadDone(Ok(path)) => {
+                self.arm_busy = false;
+                self.log_ok(t!(self.lang, Msg::ArmDownloaded, path));
+            }
+            WorkerEvent::ArmDownloadDone(Err(e)) => {
+                self.arm_busy = false;
+                self.log_err(e);
+            }
             WorkerEvent::RttData { channel, data } => {
                 let text = String::from_utf8_lossy(&data);
                 match self.rtt_view_channel {

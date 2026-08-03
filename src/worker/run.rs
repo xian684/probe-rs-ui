@@ -150,6 +150,10 @@ pub(super) fn run(
                     );
                     let _ = events.send(WorkerEvent::ArmGenerateDone(result));
                 }
+                WorkerCommand::ArmDownload { url, output_dir } => {
+                    let result = super::arm::download_pack(&url, &output_dir, lang);
+                    let _ = events.send(WorkerEvent::ArmDownloadDone(result));
+                }
                 WorkerCommand::TargetGenGenerate {
                     input,
                     output_dir,

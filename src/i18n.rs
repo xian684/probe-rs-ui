@@ -100,6 +100,8 @@ pub enum Msg {
     TgLoadedToSelection,
     ArmIndexFailed,
     ArmGenerateFailed,
+    ArmDownloadFailed,
+    ArmDownloaded,
     ArmSearchResult,
     ArmGenerated,
     ArmSearchTitle,
@@ -111,7 +113,9 @@ pub enum Msg {
     ArmSearchingTitle,
     ArmDownloading,
     ArmSearchBtn,
+    ArmDownloadBtn,
     ArmGenerateBtn,
+    ArmGenerateImportBtn,
     ArmNoResult,
     // ---- 固件烧录 ----
     FirmwareFlashing,
@@ -470,6 +474,16 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "Failed to generate from the ARM online index: {}",
     ),
     (
+        Msg::ArmDownloadFailed,
+        "下载 Pack 失败: {}",
+        "Failed to download the Pack: {}",
+    ),
+    (
+        Msg::ArmDownloaded,
+        "已下载 Pack: {}",
+        "Pack downloaded: {}",
+    ),
+    (
         Msg::ArmSearchResult,
         "从 ARM 索引找到 {} 个匹配的 Pack",
         "Found {} matching Pack(s) in the ARM index",
@@ -508,7 +522,13 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "Downloading and generating from the ARM index: {} (may take a while)...",
     ),
     (Msg::ArmSearchBtn, "搜索", "Search"),
+    (Msg::ArmDownloadBtn, "下载", "Download"),
     (Msg::ArmGenerateBtn, "下载并生成", "Download & Generate"),
+    (
+        Msg::ArmGenerateImportBtn,
+        "下载并添加",
+        "Download & Add",
+    ),
     (
         Msg::ArmNoResult,
         "无匹配结果，请输入关键字（如 GD32 / STM32F4）后搜索",
