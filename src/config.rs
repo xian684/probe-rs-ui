@@ -114,7 +114,7 @@ pub fn save(cfg: &AppConfig) {
 fn set_hidden(path: &std::path::Path) {
     use std::os::windows::ffi::OsStrExt;
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
-    extern "system" {
+    unsafe extern "system" {
         fn SetFileAttributesW(lpFileName: *const u16, dwFileAttributes: u32) -> i32;
     }
     let wide: Vec<u16> = std::ffi::OsStr::new(path)
