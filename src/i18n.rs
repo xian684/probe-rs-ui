@@ -83,7 +83,6 @@ pub enum Msg {
     TgOnlySupported,
     TgOnlySupportedHint,
     TgGenerate,
-    TgGenerateConnect,
     TgGenerating,
     TgResult,
     TgVariants,
@@ -390,7 +389,6 @@ const MSGS: &[(Msg, &str, &str)] = &[
         "When checked, only targets for probe-rs built-in supported families are kept",
     ),
     (Msg::TgGenerate, "生成芯片描述", "Generate"),
-    (Msg::TgGenerateConnect, "生成并连接", "Generate & Connect"),
     (
         Msg::TgGenerating,
         "正在从 CMSIS Pack 生成 target 定义，请稍候...",

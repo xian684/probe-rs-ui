@@ -478,18 +478,6 @@ impl ProbeUiApp {
                 )
                 .clicked()
             {
-                self.tg_auto_connect = false;
-                self.start_target_gen();
-            }
-            let can_auto = can_generate && !self.probes.is_empty() && !self.connecting && !self.busy;
-            if ui
-                .add_enabled(
-                    can_auto,
-                    egui::Button::new(self.icon("⚡", Msg::TgGenerateConnect)),
-                )
-                .clicked()
-            {
-                self.tg_auto_connect = true;
                 self.start_target_gen();
             }
         });
@@ -529,11 +517,9 @@ impl ProbeUiApp {
         let input = PathBuf::from(self.tg_input.trim());
         if !input.exists() {
             self.log_err(t!(self.lang, Msg::TgInputMissing, self.tg_input));
-            self.tg_auto_connect = false;
             return;
         }
         let output_dir = PathBuf::from(self.tg_output_dir.trim());
-        let auto_load = self.tg_auto_connect;
         self.tg_busy = true;
         self.tg_result = None;
         self.log_info(t!(self.lang, Msg::GeneratingFromPack, self.tg_input));
@@ -541,7 +527,7 @@ impl ProbeUiApp {
             input,
             output_dir,
             only_supported: self.tg_only_supported,
-            auto_load,
+            auto_load: true,
         });
     }
 
