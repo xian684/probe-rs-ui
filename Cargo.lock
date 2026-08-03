@@ -3448,6 +3448,7 @@ dependencies = [
  "rfd",
  "serde",
  "target-gen",
+ "tokio",
  "toml 0.8.23",
  "winresource",
 ]

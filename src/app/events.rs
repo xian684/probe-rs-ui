@@ -184,6 +184,56 @@ impl ProbeUiApp {
                 self.tg_busy = false;
                 self.log_err(e);
             }
+            WorkerEvent::ArmSearchDone(Ok(list)) => {
+                self.arm_busy = false;
+                self.arm_packs = list;
+                self.arm_selected = None;
+                self.log_info(t!(
+                    self.lang,
+                    Msg::ArmSearchResult,
+                    self.arm_packs.len()
+                ));
+            }
+            WorkerEvent::ArmSearchDone(Err(e)) => {
+                self.arm_busy = false;
+                self.arm_packs.clear();
+                self.log_err(e);
+            }
+            WorkerEvent::ArmGenerateDone(Ok(mut result)) => {
+                self.arm_busy = false;
+                let n = result.families.len();
+                let loaded_n = result.loaded.len();
+                self.log_ok(t!(self.lang, Msg::ArmGenerated, n));
+                for family in &result.families {
+                    if !family.output_file.is_empty() {
+                        self.log_info(t!(
+                            self.lang,
+                            Msg::TargetFileWritten,
+                            family.output_file,
+                            family.variant_count
+                        ));
+                    }
+                }
+                let mut skipped = 0;
+                for info in result.loaded.drain(..) {
+                    if self.merge_chip_file(info) == ChipMergeResult::Skipped {
+                        skipped += 1;
+                    }
+                }
+                if loaded_n > 0 {
+                    let merged = loaded_n - skipped;
+                    if merged > 0 {
+                        self.log_info(t!(self.lang, Msg::TgLoadedToSelection, merged));
+                    }
+                    if skipped > 0 {
+                        self.log_info(t!(self.lang, Msg::PackGeneratedSkipped, skipped));
+                    }
+                }
+            }
+            WorkerEvent::ArmGenerateDone(Err(e)) => {
+                self.arm_busy = false;
+                self.log_err(e);
+            }
             WorkerEvent::RttData { channel, data } => {
                 let text = String::from_utf8_lossy(&data);
                 match self.rtt_view_channel {

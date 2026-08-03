@@ -23,6 +23,8 @@ target-gen = "0.32"
 rfd = "0.17"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
+# 供 target-gen 的 ARM 索引拉取 / 在线生成（async）使用。
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 [build-dependencies]
 winresource = "0.1"

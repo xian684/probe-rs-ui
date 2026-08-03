@@ -7,6 +7,7 @@
 //! - [`memory`]：内存读写
 //! - [`progress`]：烧录进度事件映射
 
+mod arm;
 mod flash;
 mod memory;
 mod probe;
@@ -67,6 +68,16 @@ pub struct TargetGenResult {
     pub families: Vec<TargetGenFamilyInfo>,
     /// 生成后已加载到 registry 的芯片族（供手动选型/自动连接）。
     pub loaded: Vec<ChipFileInfo>,
+}
+
+/// ARM 在线索引（Keil.pidx）中的一个 Pack 条目摘要。
+#[derive(Clone)]
+pub struct ArmPackInfo {
+    pub vendor: String,
+    pub name: String,
+    pub version: String,
+    /// 是否已废弃（deprecated）。
+    pub deprecated: bool,
 }
 
 /// 进度条状态。
@@ -133,6 +144,21 @@ pub enum WorkerCommand {
     GeneratePack {
         path: PathBuf,
     },
+    /// 拉取 ARM 在线索引（Keil.pidx），按关键字过滤（空则全部）。
+    ArmSearch {
+        keyword: String,
+    },
+    /// 从 ARM 在线索引下载匹配关键字的 Pack 并生成 target 定义。
+    ArmGenerate {
+        /// 匹配 Pack 名关键字（如 "GD32"）。
+        filter: String,
+        /// 输出目录：生成的 YAML 写入这里（留空则不落盘）。
+        output_dir: PathBuf,
+        /// 是否只生成 probe-rs 已支持芯片族（仅当 filter 为空时有意义）。
+        only_supported: bool,
+        /// 生成后是否加载到 registry（供手动选型/自动连接）。
+        auto_load: bool,
+    },
     TargetGenGenerate {
         /// 输入：.pack 文件或解压后的目录。
         input: PathBuf,
@@ -173,6 +199,8 @@ pub enum WorkerEvent {
     ChipFileLoaded(Result<ChipFileInfo, String>),
     PackGenerated(Result<Vec<ChipFileInfo>, String>),
     TargetGenDone(Result<TargetGenResult, String>),
+    ArmSearchDone(Result<Vec<ArmPackInfo>, String>),
+    ArmGenerateDone(Result<TargetGenResult, String>),
     RttData {
         channel: usize,
         data: Vec<u8>,

@@ -130,6 +130,26 @@ pub(super) fn run(
                     let result = generate_from_pack(&mut registry, &path, lang);
                     let _ = events.send(WorkerEvent::PackGenerated(result));
                 }
+                WorkerCommand::ArmSearch { keyword } => {
+                    let result = super::arm::search_packs(&keyword, lang);
+                    let _ = events.send(WorkerEvent::ArmSearchDone(result));
+                }
+                WorkerCommand::ArmGenerate {
+                    filter,
+                    output_dir,
+                    only_supported,
+                    auto_load,
+                } => {
+                    let result = super::arm::generate_from_arm(
+                        &mut registry,
+                        &filter,
+                        &output_dir,
+                        only_supported,
+                        auto_load,
+                        lang,
+                    );
+                    let _ = events.send(WorkerEvent::ArmGenerateDone(result));
+                }
                 WorkerCommand::TargetGenGenerate {
                     input,
                     output_dir,

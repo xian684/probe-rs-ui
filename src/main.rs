@@ -10,6 +10,24 @@ mod panels;
 mod rtt;
 mod worker;
 
+/// 在一次性 tokio runtime 上执行 target-gen 的 async 操作（ARM 索引拉取 / 在线生成）。
+///
+/// target-gen 的 `fetch` / `generate` 相关函数为 async，而本应用的工作线程是同步的；
+/// 这里为每次调用创建一个短生命周期 runtime 并 block_on，避免引入全局 runtime 的复杂度。
+pub(crate) fn arm_runtime_block_on<F>(
+    future: F,
+) -> Result<F::Output, Box<dyn std::error::Error>>
+where
+    F: std::future::Future,
+{
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .expect("创建 tokio runtime 失败");
+    Ok(rt.block_on(future))
+}
+
 /// 程序生成的 64x64 窗口图标（芯片样式）。
 fn app_icon() -> eframe::egui::IconData {
     const S: usize = 64;

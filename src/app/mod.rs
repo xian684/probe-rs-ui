@@ -16,8 +16,8 @@ use crate::firmware::FirmwareCandidate;
 use crate::i18n::{Lang, Msg};
 use crate::t;
 use crate::worker::{
-    self, BootMode, ChipFileInfo, OpState, ProbeInfo, TargetGenResult, TargetSummary,
-    WorkerCommand, WorkerEvent,
+    self, ArmPackInfo, BootMode, ChipFileInfo, OpState, ProbeInfo, TargetGenResult,
+    TargetSummary, WorkerCommand, WorkerEvent,
 };
 
 mod actions;
@@ -153,6 +153,12 @@ pub struct ProbeUiApp {
     pub(crate) tg_busy: bool,
     pub(crate) tg_result: Option<TargetGenResult>,
 
+    // ---- ARM 在线索引 ----
+    pub(crate) arm_keyword: String,
+    pub(crate) arm_packs: Vec<ArmPackInfo>,
+    pub(crate) arm_busy: bool,
+    pub(crate) arm_selected: Option<usize>,
+
     last_save: Instant,
     win_size: Option<[f32; 2]>,
     win_pos: Option<[f32; 2]>,
@@ -223,6 +229,10 @@ impl ProbeUiApp {
             tg_only_supported: false,
             tg_busy: false,
             tg_result: None,
+            arm_keyword: String::new(),
+            arm_packs: Vec::new(),
+            arm_busy: false,
+            arm_selected: None,
             last_save: Instant::now(),
             win_size: saved.window_size,
             win_pos: saved.window_pos,
@@ -402,7 +412,13 @@ impl eframe::App for ProbeUiApp {
             config::save(&self.collect_config(ctx));
         }
 
-        if self.probing || self.connecting || self.busy || self.rtt_on || self.mem_busy || self.tg_busy
+        if self.probing
+            || self.connecting
+            || self.busy
+            || self.rtt_on
+            || self.mem_busy
+            || self.tg_busy
+            || self.arm_busy
         {
             ctx.request_repaint_after(Duration::from_millis(40));
         }
