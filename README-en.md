@@ -12,6 +12,7 @@ It automatically detects debug probes, identifies target chips, supports manual 
 - 🎯 **Target auto-detection**: Auto-identifies the chip when the probe reports it (ST-Link / J-Link, etc.).
 - 🔌 **Connection mode**: Choose **Normal** or **Under Reset** connection, matching STM32 BOOT0/BOOT1 boot configurations — useful when target code interferes with SWD or when booting from system memory.
 - 🧩 **Manual chip selection**: Full built-in probe-rs chip database with three-level cascade selection by brand, family and variant, plus real-time keyword search (required for probes such as DAPLink / CMSIS-DAP that cannot self-identify).
+- 📦 **Advanced chip config**: A collapsible panel on the left embeds [target-gen](https://probe.rs/docs/tools/target-gen/) — pick a local CMSIS pack (`.pack` / `.pdsc` / `.zip` or an unzipped directory) to auto-generate chip descriptions into the manual selection list, with one-click **Generate & Connect**; existing YAML description files can also be loaded.
 - 📁 **Firmware auto-location**: Pick a project folder and the tool scans common build outputs (cargo `target/`, Keil `Objects/`, CubeIDE `Debug/`, CMake `build/`, etc.) and auto-selects the best firmware; a dropdown lets you switch when multiple candidates are found.
 - ⚡ **Flashing**: Supports `.elf` / `.axf` / `.hex` / `.bin` / `.uf2`, including extensionless Rust ELF build artifacts.
 - ⚙️ **Configurable options**: chip erase before flash, verify after flash, keep unwritten bytes, reset and run after flash.

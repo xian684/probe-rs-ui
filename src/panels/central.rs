@@ -13,19 +13,16 @@ impl ProbeUiApp {
             let l_flash = self.icon("⚡", Msg::FirmwareFlashing);
             let l_mem = self.icon("🔬", Msg::MemoryViewer);
             let l_rtt = self.icon("📡", Msg::RttLog);
-            let l_tg = self.icon("🧩", Msg::TargetGenerator);
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.central_tab, CentralTab::Flash, l_flash);
                 ui.selectable_value(&mut self.central_tab, CentralTab::Memory, l_mem);
                 ui.selectable_value(&mut self.central_tab, CentralTab::Rtt, l_rtt);
-                ui.selectable_value(&mut self.central_tab, CentralTab::TargetGen, l_tg);
             });
             ui.separator();
             match self.central_tab {
                 CentralTab::Flash => self.flash_view_ui(ui),
                 CentralTab::Memory => self.mem_view_ui(ui),
                 CentralTab::Rtt => self.rtt_view_ui(ui),
-                CentralTab::TargetGen => self.target_gen_view_ui(ui),
             }
         });
     }

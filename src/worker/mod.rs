@@ -53,12 +53,11 @@ pub struct ChipFileInfo {
     pub chips: Vec<String>,
 }
 
-/// target-gen 生成的单个芯片族摘要（用于结果表格展示）。
+/// target-gen 生成的单个芯片族摘要（用于左侧面板结果展示）。
 #[derive(Clone)]
 pub struct TargetGenFamilyInfo {
     pub name: String,
     pub variant_count: usize,
-    pub flash_algo_count: usize,
     pub output_file: String,
 }
 
@@ -66,6 +65,8 @@ pub struct TargetGenFamilyInfo {
 #[derive(Clone)]
 pub struct TargetGenResult {
     pub families: Vec<TargetGenFamilyInfo>,
+    /// 生成后已加载到 registry 的芯片族（供手动选型/自动连接）。
+    pub loaded: Vec<ChipFileInfo>,
 }
 
 /// 进度条状态。
@@ -135,10 +136,12 @@ pub enum WorkerCommand {
     TargetGenGenerate {
         /// 输入：.pack 文件或解压后的目录。
         input: PathBuf,
-        /// 输出目录：生成的 YAML target 文件将写入这里。
+        /// 输出目录：生成的 YAML target 文件将写入这里（留空则不落盘）。
         output_dir: PathBuf,
         /// 是否只生成 probe-rs 已支持芯片族的 target（对应 target-gen 的 only_supported_families）。
         only_supported: bool,
+        /// 生成后是否加载到 registry（供手动选型/自动连接）。
+        auto_load: bool,
     },
     SetLang(Lang),
     RttStart,

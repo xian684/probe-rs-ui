@@ -1,4 +1,6 @@
-//! 左侧设备检测面板：探针选择、连接方式、自动识别、手动指定目标与目标信息。
+//! 左侧设备检测面板：探针选择、连接方式、自动识别、手动指定目标、高级芯片配置与目标信息。
+
+use std::path::PathBuf;
 
 use eframe::egui;
 
@@ -139,6 +141,13 @@ impl ProbeUiApp {
         }
 
         ui.add_space(4.0);
+        // 高级芯片配置：加载本地 CMSIS Pack，自动生成芯片描述并连接目标。
+        egui::CollapsingHeader::new(self.t(Msg::AdvancedChipConfig))
+            .id_salt("advanced_chip_config")
+            .default_open(false)
+            .show(ui, |ui| self.advanced_chip_config_ui(ui));
+        ui.add_space(4.0);
+
         ui.horizontal(|ui| {
             ui.heading(self.t(Msg::ManualTargetSel));
             if self.show_manual {
@@ -404,6 +413,138 @@ impl ProbeUiApp {
                 boot_mode: self.boot_mode,
             });
         }
+    }
+
+    /// 高级芯片配置：选择 CMSIS Pack（.pack/.pdsc/.zip 或目录），
+    /// 自动生成芯片描述并注册，可选一键连接目标。
+    fn advanced_chip_config_ui(&mut self, ui: &mut egui::Ui) {
+        ui.label(
+            egui::RichText::new(self.t(Msg::AdvancedChipConfigHint))
+                .small()
+                .weak(),
+        );
+
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(self.t(Msg::TgInput));
+            let hint = self.t(Msg::TgInputHint);
+            ui.add(
+                egui::TextEdit::singleline(&mut self.tg_input)
+                    .desired_width(f32::INFINITY)
+                    .font(egui::TextStyle::Small)
+                    .hint_text(hint),
+            );
+            if ui.button(self.icon("📂", Msg::TgBrowseFile)).clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("CMSIS Pack", &["pack", "pdsc", "zip"])
+                    .pick_file()
+                {
+                    self.tg_input = path.display().to_string();
+                }
+            }
+            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked() {
+                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                    self.tg_input = dir.display().to_string();
+                }
+            }
+        });
+
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(self.t(Msg::TgOutputDir));
+            let hint = self.t(Msg::TgOutputDirHint);
+            ui.add(
+                egui::TextEdit::singleline(&mut self.tg_output_dir)
+                    .desired_width(f32::INFINITY)
+                    .font(egui::TextStyle::Small)
+                    .hint_text(hint),
+            );
+            if ui.button(self.icon("📁", Msg::TgBrowseDir)).clicked() {
+                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                    self.tg_output_dir = dir.display().to_string();
+                }
+            }
+        });
+
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            let l_only = self.t(Msg::TgOnlySupported);
+            ui.checkbox(&mut self.tg_only_supported, l_only);
+            let can_generate = !self.tg_busy && !self.tg_input.trim().is_empty();
+            if ui
+                .add_enabled(
+                    can_generate,
+                    egui::Button::new(self.icon("🔧", Msg::TgGenerate))
+                        .fill(egui::Color32::from_rgb(0x1f, 0x6f, 0xc3)),
+                )
+                .clicked()
+            {
+                self.tg_auto_connect = false;
+                self.start_target_gen();
+            }
+            let can_auto = can_generate && !self.probes.is_empty() && !self.connecting && !self.busy;
+            if ui
+                .add_enabled(
+                    can_auto,
+                    egui::Button::new(self.icon("⚡", Msg::TgGenerateConnect)),
+                )
+                .clicked()
+            {
+                self.tg_auto_connect = true;
+                self.start_target_gen();
+            }
+        });
+        ui.label(
+            egui::RichText::new(self.t(Msg::TgOnlySupportedHint))
+                .small()
+                .weak(),
+        );
+        if self.tg_busy {
+            ui.horizontal(|ui| {
+                ui.add(egui::Spinner::new());
+                ui.label(self.t(Msg::TgGenerating));
+            });
+        }
+
+        // 生成结果摘要（仅显示芯片族名与型号数，保持面板紧凑）。
+        if let Some(result) = &self.tg_result {
+            if !result.families.is_empty() {
+                ui.add_space(4.0);
+                ui.label(egui::RichText::new(self.t(Msg::TgResult)).strong().small());
+                for family in &result.families {
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{} ({} {})",
+                            family.name,
+                            family.variant_count,
+                            self.t(Msg::TgVariants)
+                        ))
+                        .small(),
+                    );
+                }
+            }
+        }
+    }
+
+    /// 校验输入/输出并发送生成命令。
+    fn start_target_gen(&mut self) {
+        let input = PathBuf::from(self.tg_input.trim());
+        if !input.exists() {
+            self.log_err(t!(self.lang, Msg::TgInputMissing, self.tg_input));
+            self.tg_auto_connect = false;
+            return;
+        }
+        let output_dir = PathBuf::from(self.tg_output_dir.trim());
+        let auto_load = self.tg_auto_connect;
+        self.tg_busy = true;
+        self.tg_result = None;
+        self.log_info(t!(self.lang, Msg::GeneratingFromPack, self.tg_input));
+        self.send(WorkerCommand::TargetGenGenerate {
+            input,
+            output_dir,
+            only_supported: self.tg_only_supported,
+            auto_load,
+        });
     }
 
     /// 左栏底部固定显示的目标信息框（连接成功后展示芯片与内存映射）。

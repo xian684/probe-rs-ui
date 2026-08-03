@@ -134,9 +134,16 @@ pub(super) fn run(
                     input,
                     output_dir,
                     only_supported,
+                    auto_load,
                 } => {
-                    let result =
-                        super::target_gen::generate_targets(&input, &output_dir, only_supported, lang);
+                    let result = super::target_gen::generate_targets(
+                        &mut registry,
+                        &input,
+                        &output_dir,
+                        only_supported,
+                        auto_load,
+                        lang,
+                    );
                     let _ = events.send(WorkerEvent::TargetGenDone(result));
                 }
                 WorkerCommand::SetLang(l) => lang = l,

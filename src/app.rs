@@ -40,7 +40,6 @@ pub(crate) enum CentralTab {
     Flash,
     Memory,
     Rtt,
-    TargetGen,
 }
 
 pub(crate) struct LogEntry {
@@ -114,12 +113,14 @@ pub struct ProbeUiApp {
     pub(crate) mem_write_start: u64,
     pub(crate) mem_write_input: String,
 
-    // ---- Target 生成器 ----
+    // ---- Target 生成器（左侧高级芯片配置面板） ----
     pub(crate) tg_input: String,
     pub(crate) tg_output_dir: String,
     pub(crate) tg_only_supported: bool,
     pub(crate) tg_busy: bool,
     pub(crate) tg_result: Option<TargetGenResult>,
+    /// 生成完成后自动连接目标（选中第一个可用型号并发起连接）。
+    pub(crate) tg_auto_connect: bool,
 
     last_save: Instant,
     win_size: Option<[f32; 2]>,
@@ -188,6 +189,7 @@ impl ProbeUiApp {
             tg_only_supported: false,
             tg_busy: false,
             tg_result: None,
+            tg_auto_connect: false,
             last_save: Instant::now(),
             win_size: saved.window_size,
             win_pos: saved.window_pos,
@@ -287,7 +289,6 @@ impl ProbeUiApp {
         self.central_tab = match cfg.central_tab.as_str() {
             "memory" => CentralTab::Memory,
             "rtt" => CentralTab::Rtt,
-            "target_gen" => CentralTab::TargetGen,
             _ => CentralTab::Flash,
         };
         self.mem_start = cfg.mem_start;
@@ -346,7 +347,6 @@ impl ProbeUiApp {
                 CentralTab::Flash => "flash",
                 CentralTab::Memory => "memory",
                 CentralTab::Rtt => "rtt",
-                CentralTab::TargetGen => "target_gen",
             }
             .into(),
             mem_start: self.mem_start,
@@ -523,21 +523,56 @@ impl ProbeUiApp {
             WorkerEvent::PackGenerated(Err(e)) => {
                 self.log_err(e);
             }
-            WorkerEvent::TargetGenDone(Ok(result)) => {
+            WorkerEvent::TargetGenDone(Ok(mut result)) => {
                 self.tg_busy = false;
+                let auto_connect = self.tg_auto_connect;
+                self.tg_auto_connect = false;
+                let n = result.families.len();
+                let loaded_n = result.loaded.len();
+                // 生成后合并进手动选型列表（若有输出目录，同时记录落盘文件）。
+                let first_chip = result
+                    .loaded
+                    .iter()
+                    .find_map(|info| info.chips.first().cloned());
+                // 先保存结果供左侧面板展示，再移动 loaded 合并进选型列表。
                 self.tg_result = Some(result.clone());
-                self.log_ok(t!(self.lang, Msg::TargetsGenerated, result.families.len()));
+                for info in result.loaded.drain(..) {
+                    self.merge_chip_file(info);
+                }
+                self.log_ok(t!(self.lang, Msg::TargetsGenerated, n));
                 for family in &result.families {
-                    self.log_info(t!(
-                        self.lang,
-                        Msg::TargetFileWritten,
-                        family.output_file,
-                        family.variant_count
-                    ));
+                    if !family.output_file.is_empty() {
+                        self.log_info(t!(
+                            self.lang,
+                            Msg::TargetFileWritten,
+                            family.output_file,
+                            family.variant_count
+                        ));
+                    }
+                }
+                if loaded_n > 0 {
+                    self.log_info(t!(self.lang, Msg::TgLoadedToSelection, loaded_n));
+                }
+                // 请求自动连接：选中第一个型号并连接。
+                if auto_connect {
+                    if self.probes.is_empty() {
+                        self.log_warn(self.t(Msg::ConnectFirst));
+                    } else if let Some(chip) = first_chip {
+                        self.manual_target = chip.clone();
+                        self.connecting = true;
+                        self.busy = true;
+                        self.log_info(t!(self.lang, Msg::ConnectingTo, chip));
+                        self.send(WorkerCommand::ConnectManual {
+                            probe: self.selected_probe,
+                            target: chip,
+                            boot_mode: self.boot_mode,
+                        });
+                    }
                 }
             }
             WorkerEvent::TargetGenDone(Err(e)) => {
                 self.tg_busy = false;
+                self.tg_auto_connect = false;
                 self.log_err(e);
             }
             WorkerEvent::RttData { channel, data } => {
