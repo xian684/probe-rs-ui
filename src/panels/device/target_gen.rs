@@ -10,8 +10,8 @@ use crate::t;
 use crate::worker::WorkerCommand;
 
 impl ProbeUiApp {
-    /// 高级芯片配置：选择 CMSIS Pack（.pack/.pdsc/.zip 或目录），
-    /// 自动生成芯片描述并注册，可选一键连接目标。
+    /// 高级芯片配置：选择 CMSIS Pack（.pack/.pdsc/.zip），
+    /// 生成芯片描述（可选自动导入选型列表）。
     pub(crate) fn advanced_chip_config_ui(&mut self, ui: &mut egui::Ui) {
         ui.label(
             egui::RichText::new(self.t(Msg::AdvancedChipConfigHint))
@@ -68,7 +68,17 @@ impl ProbeUiApp {
                 )
                 .clicked()
             {
-                self.start_target_gen();
+                self.start_target_gen(false);
+            }
+            let can_import = can_generate;
+            if ui
+                .add_enabled(
+                    can_import,
+                    egui::Button::new(self.icon("📥", Msg::TgGenerateImport)),
+                )
+                .clicked()
+            {
+                self.start_target_gen(true);
             }
         });
         ui.label(
@@ -103,7 +113,10 @@ impl ProbeUiApp {
     }
 
     /// 校验输入/输出并发送生成命令。
-    fn start_target_gen(&mut self) {
+    /// 校验输入/输出并发送生成命令。
+    ///
+    /// `auto_load` 为 true 时生成后自动导入选型列表（worker 侧 auto_load=true）。
+    fn start_target_gen(&mut self, auto_load: bool) {
         let input = PathBuf::from(self.tg_input.trim());
         if !input.exists() {
             self.log_err(t!(self.lang, Msg::TgInputMissing, self.tg_input));
@@ -117,7 +130,7 @@ impl ProbeUiApp {
             input,
             output_dir,
             only_supported: self.tg_only_supported,
-            auto_load: true,
+            auto_load,
         });
     }
 }
