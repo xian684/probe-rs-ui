@@ -22,9 +22,14 @@ impl ProbeUiApp {
         );
 
         // 搜索行：关键字 + 搜索按钮（输出目录复用左侧高级芯片配置的 tg_output_dir）。
+        // 标签统一宽度，使两行输入框左边缘对齐。
+        const LABEL_W: f32 = 110.0;
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            ui.label(self.t(Msg::ArmSearchKeyword));
+            ui.add_sized(
+                [LABEL_W, ui.text_style_height(&egui::TextStyle::Body)],
+                egui::Label::new(self.t(Msg::ArmSearchKeyword)),
+            );
             let hint = self.t(Msg::ArmSearchHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.arm_keyword)
@@ -52,7 +57,10 @@ impl ProbeUiApp {
 
         // 输出目录提示（可选落盘位置，留空则不落盘仅导入）。
         ui.horizontal(|ui| {
-            ui.label(self.t(Msg::TgOutputDir));
+            ui.add_sized(
+                [LABEL_W, ui.text_style_height(&egui::TextStyle::Body)],
+                egui::Label::new(self.t(Msg::TgOutputDir)),
+            );
             let hint = self.t(Msg::TgOutputDirHint);
             ui.add(
                 egui::TextEdit::singleline(&mut self.tg_output_dir)
