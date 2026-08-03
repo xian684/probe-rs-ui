@@ -212,6 +212,8 @@ pub enum WorkerEvent {
     },
     ChipFileLoaded(Result<ChipFileInfo, String>),
     PackGenerated(Result<Vec<ChipFileInfo>, String>),
+    /// 启动恢复外部芯片包来源完成（与手动导入区分，用于跳过已删除的家族）。
+    RestoreExternalDone(Result<Vec<ChipFileInfo>, String>),
     TargetGenDone(Result<TargetGenResult, String>),
     ArmSearchDone(Result<Vec<ArmPackInfo>, String>),
     ArmGenerateDone(Result<TargetGenResult, String>),

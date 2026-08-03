@@ -103,6 +103,8 @@ pub struct ProbeUiApp {
     pub(crate) external_families: Vec<ChipFamilyInfo>,
     /// 历史导入过的外部芯片包来源文件路径（持久化，启动时自动恢复）。
     pub(crate) external_sources: Vec<String>,
+    /// 已删除的外部芯片包家族名黑名单（持久化）：恢复时跳过，避免删除后又自动加回。
+    pub(crate) external_removed: Vec<String>,
     /// 外部芯片包下拉选中的家族索引。
     pub(crate) selected_external_family: Option<usize>,
     /// 手动选型视图：内置芯片包 / 外部芯片包。
@@ -191,6 +193,7 @@ impl ProbeUiApp {
             chip_brands,
             external_families: Vec::new(),
             external_sources: Vec::new(),
+            external_removed: Vec::new(),
             selected_external_family: None,
             pack_tab: PackTab::Builtin,
             selected_brand: None,
@@ -326,7 +329,17 @@ impl ProbeUiApp {
     /// 去重规则：
     /// - 已存在同名的外部芯片族：不重复添加，仅并入新型号（并集）；
     /// - 否则新增一条目。
-    fn merge_chip_file(&mut self, info: ChipFileInfo) -> ChipMergeResult {
+    ///
+    /// `is_restore` 为 true 表示来自启动恢复：若家族在删除黑名单中则跳过；
+    /// 手动导入（false）则会清除黑名单记录，视为用户重新导入。
+    fn merge_chip_file(&mut self, info: ChipFileInfo, is_restore: bool) -> ChipMergeResult {
+        if self.external_removed.contains(&info.family_name) {
+            if is_restore {
+                return ChipMergeResult::Removed;
+            }
+            // 手动重新导入：清除删除标记，恢复正常合并。
+            self.external_removed.retain(|n| n != &info.family_name);
+        }
         if let Some(existing) = self
             .external_families
             .iter_mut()
@@ -353,6 +366,25 @@ impl ProbeUiApp {
         ChipMergeResult::Added
     }
 
+    /// 删除一个外部芯片包（家族）：从当前列表移除并记入黑名单，
+    /// 使下次启动恢复时跳过该家族。
+    pub(crate) fn remove_external_family(&mut self, name: &str) -> bool {
+        let before = self.external_families.len();
+        self.external_families.retain(|f| f.name != name);
+        if self.external_families.len() == before {
+            return false;
+        }
+        if !self.external_removed.contains(&name.to_owned()) {
+            self.external_removed.push(name.to_owned());
+        }
+        // 校正下拉选中索引。
+        let max = self.external_families.len().saturating_sub(1);
+        if self.selected_external_family.is_some_and(|i| i > max) {
+            self.selected_external_family = None;
+        }
+        true
+    }
+
     /// 记录一个外部芯片包来源文件路径（供下次启动自动恢复）。
     ///
     /// 重复路径不重复记录；空路径忽略。
@@ -374,6 +406,8 @@ pub(crate) enum ChipMergeResult {
     Updated,
     /// 完全重复（或与内置同名），已跳过。
     Skipped,
+    /// 家族在用户删除黑名单中（仅恢复场景），已跳过。
+    Removed,
 }
 
 impl Drop for ProbeUiApp {

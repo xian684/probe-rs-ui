@@ -278,13 +278,12 @@ fn handle_restore_external(ctx: &mut Ctx, path: &Path, lang: Lang) {
         .extension()
         .map(|e| e == "yaml" || e == "yml")
         .unwrap_or(false);
-    if is_yaml {
-        let result = load_chip_file(ctx.registry, path, lang);
-        let _ = ctx.events.send(WorkerEvent::ChipFileLoaded(result));
+    let result = if is_yaml {
+        load_chip_file(ctx.registry, path, lang).map(|info| vec![info])
     } else {
-        let result = generate_from_pack(ctx.registry, path, lang);
-        let _ = ctx.events.send(WorkerEvent::PackGenerated(result));
-    }
+        generate_from_pack(ctx.registry, path, lang)
+    };
+    let _ = ctx.events.send(WorkerEvent::RestoreExternalDone(result));
 }
 
 /// 搜索 ARM 在线索引（Keil.pidx）。

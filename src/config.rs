@@ -46,6 +46,8 @@ pub struct AppConfig {
     pub tg_output_dir: String,
     /// 历史导入过的外部芯片包来源文件（YAML 描述或 CMSIS Pack），启动时自动恢复。
     pub external_sources: Vec<String>,
+    /// 已删除的外部芯片包家族名（黑名单）：恢复时跳过，避免删除后又被自动加回。
+    pub external_removed: Vec<String>,
     /// 窗口大小（宽、高）。
     pub window_size: Option<[f32; 2]>,
     /// 窗口位置（x、y）。
@@ -76,6 +78,7 @@ impl Default for AppConfig {
             tg_input: String::new(),
             tg_output_dir: String::new(),
             external_sources: Vec::new(),
+            external_removed: Vec::new(),
             window_size: None,
             window_pos: None,
         }

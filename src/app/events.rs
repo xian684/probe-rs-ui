@@ -32,6 +32,7 @@ impl ProbeUiApp {
             } => self.on_firmware_scanned(root, candidates, best),
             WorkerEvent::ChipFileLoaded(r) => self.on_chip_file_loaded(r),
             WorkerEvent::PackGenerated(r) => self.on_pack_generated(r),
+            WorkerEvent::RestoreExternalDone(r) => self.on_restore_external_done(r),
             WorkerEvent::TargetGenDone(r) => self.on_target_gen_done(r),
             WorkerEvent::ArmSearchDone(r) => self.on_arm_search_done(r),
             WorkerEvent::ArmGenerateDone(r) => self.on_arm_generate_done(r),
@@ -176,16 +177,44 @@ impl ProbeUiApp {
             Ok(info) => {
                 let n = info.chips.len();
                 let name = info.family_name.clone();
-                match self.merge_chip_file(info) {
+                match self.merge_chip_file(info, false) {
                     ChipMergeResult::Skipped => {
                         self.log_warn(t!(self.lang, Msg::ChipFamilySkipped, name));
                     }
+                    ChipMergeResult::Removed => {}
                     _ => {
                         self.log_ok(t!(self.lang, Msg::ChipFileLoaded, name, n));
                     }
                 }
             }
             Err(e) => self.log_err(e),
+        }
+    }
+
+    /// 启动恢复外部芯片包来源完成：恢复被删除的家族跳过，其余合并。
+    fn on_restore_external_done(
+        &mut self,
+        result: Result<Vec<crate::worker::ChipFileInfo>, String>,
+    ) {
+        match result {
+            Ok(infos) => {
+                let mut merged = 0;
+                let mut skipped_removed = 0;
+                for info in infos {
+                    match self.merge_chip_file(info, true) {
+                        ChipMergeResult::Removed => skipped_removed += 1,
+                        ChipMergeResult::Skipped => {}
+                        _ => merged += 1,
+                    }
+                }
+                if merged > 0 {
+                    self.log_info(t!(self.lang, Msg::ExternalRestored, merged));
+                }
+                if skipped_removed > 0 {
+                    self.log_info(t!(self.lang, Msg::ExternalRestoreSkipped, skipped_removed));
+                }
+            }
+            Err(e) => self.log_warn(e),
         }
     }
 
@@ -196,7 +225,7 @@ impl ProbeUiApp {
                 let n = infos.len();
                 let mut skipped = 0;
                 for info in infos {
-                    if self.merge_chip_file(info) == ChipMergeResult::Skipped {
+                    if self.merge_chip_file(info, false) == ChipMergeResult::Skipped {
                         skipped += 1;
                     }
                 }
@@ -220,7 +249,7 @@ impl ProbeUiApp {
                 self.tg_result = Some(result.clone());
                 let mut skipped = 0;
                 for info in result.loaded.drain(..) {
-                    if self.merge_chip_file(info) == ChipMergeResult::Skipped {
+                    if self.merge_chip_file(info, false) == ChipMergeResult::Skipped {
                         skipped += 1;
                     }
                 }
@@ -295,7 +324,7 @@ impl ProbeUiApp {
                 }
                 let mut skipped = 0;
                 for info in result.loaded.drain(..) {
-                    if self.merge_chip_file(info) == ChipMergeResult::Skipped {
+                    if self.merge_chip_file(info, false) == ChipMergeResult::Skipped {
                         skipped += 1;
                     }
                 }

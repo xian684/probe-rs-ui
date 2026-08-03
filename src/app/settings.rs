@@ -62,6 +62,7 @@ impl ProbeUiApp {
         self.tg_output_dir = cfg.tg_output_dir;
         // 恢复历史导入过的外部芯片包来源：逐个重新加载到 registry 并合并进选型列表。
         self.external_sources = cfg.external_sources;
+        self.external_removed = cfg.external_removed;
         for src in &self.external_sources {
             if !src.trim().is_empty() {
                 self.send(WorkerCommand::RestoreExternal {
@@ -136,6 +137,7 @@ impl ProbeUiApp {
             tg_input: self.tg_input.clone(),
             tg_output_dir: self.tg_output_dir.clone(),
             external_sources: self.external_sources.clone(),
+            external_removed: self.external_removed.clone(),
             window_size: self.win_size,
             window_pos: self.win_pos,
         }

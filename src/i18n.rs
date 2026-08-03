@@ -99,6 +99,10 @@ pub enum Msg {
     TargetFileWritten,
     TgLoadedToSelection,
     RestoringExternalPacks,
+    ExternalRestored,
+    ExternalRestoreSkipped,
+    ExternalRemoveBtn,
+    ExternalRemoved,
     ArmIndexFailed,
     ArmGenerateFailed,
     ArmDownloadFailed,
@@ -468,6 +472,22 @@ const MSGS: &[(Msg, &str, &str)] = &[
         Msg::RestoringExternalPacks,
         "正在恢复 {} 个外部芯片包来源...",
         "Restoring {} external chip pack source(s)...",
+    ),
+    (
+        Msg::ExternalRestored,
+        "已恢复 {} 个外部芯片族",
+        "Restored {} external chip family(ies)",
+    ),
+    (
+        Msg::ExternalRestoreSkipped,
+        "其中 {} 个芯片族已删除，跳过恢复",
+        "{} family(ies) were previously removed and skipped",
+    ),
+    (Msg::ExternalRemoveBtn, "删除此芯片包", "Remove Pack"),
+    (
+        Msg::ExternalRemoved,
+        "已删除外部芯片包: {}",
+        "Removed external pack: {}",
     ),
     (
         Msg::ArmIndexFailed,

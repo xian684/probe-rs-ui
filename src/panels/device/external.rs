@@ -4,6 +4,7 @@ use eframe::egui;
 
 use crate::app::ProbeUiApp;
 use crate::i18n::Msg;
+use crate::t;
 
 impl ProbeUiApp {
     /// 外部芯片包选择区：显示通过 YAML / CMSIS Pack 导入的芯片族，
@@ -19,6 +20,11 @@ impl ProbeUiApp {
         }
         ui.add_space(4.0);
         ui.label(egui::RichText::new(self.t(Msg::ExternalPackHint)).small().weak());
+        // 当前选中家族的名称（供删除按钮使用，避免闭包内借用冲突）。
+        let sel_name: Option<String> = self
+            .selected_external_family
+            .and_then(|i| self.external_families.get(i))
+            .map(|f| f.name.clone());
         ui.horizontal(|ui| {
             ui.label(self.t(Msg::ExternalPackSel));
             let sel_text = self
@@ -45,6 +51,19 @@ impl ProbeUiApp {
                     && let Some(first) = fam.chips.first() {
                         self.manual_target = first.clone();
                     }
+            }
+            // 删除当前选中的外部芯片包（记入黑名单，启动恢复时跳过）。
+            let can_remove = sel_name.is_some() && !self.busy && !self.connecting;
+            if ui
+                .add_enabled(
+                    can_remove,
+                    egui::Button::new(self.icon("🗑", Msg::ExternalRemoveBtn)),
+                )
+                .clicked()
+                && let Some(name) = sel_name.clone()
+            {
+                self.log_ok(t!(self.lang, Msg::ExternalRemoved, name));
+                self.remove_external_family(&name);
             }
         });
         // 型号列表：显示选中家族的芯片型号（高度压缩，保持连接按钮可见）。
