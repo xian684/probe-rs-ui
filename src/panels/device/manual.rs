@@ -137,13 +137,13 @@ impl ProbeUiApp {
             ui.spacing_mut().item_spacing.x = 4.0;
 
             ui.allocate_ui_with_layout(
-                egui::vec2(brand_w, 240.0),
+                egui::vec2(brand_w, 180.0),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
                     ui.label(egui::RichText::new(self.t(Msg::Brand)).strong().small());
                     egui::ScrollArea::vertical()
                         .id_salt("brand_list")
-                        .max_height(215.0)
+                        .max_height(155.0)
                         .show(ui, |ui| {
                             if brand_fams.is_empty() {
                                 ui.label(egui::RichText::new(self.t(Msg::NoMatchingBrand)).weak());
@@ -166,13 +166,13 @@ impl ProbeUiApp {
             );
 
             ui.allocate_ui_with_layout(
-                egui::vec2(family_w, 240.0),
+                egui::vec2(family_w, 180.0),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
                     ui.label(egui::RichText::new(self.t(Msg::Family)).strong().small());
                     egui::ScrollArea::vertical()
                         .id_salt("fam_list")
-                        .max_height(215.0)
+                        .max_height(155.0)
                         .show(ui, |ui| {
                             if fam_matches.is_empty() {
                                 ui.label(egui::RichText::new(self.t(Msg::NoMatchingFamily)).weak());
@@ -196,14 +196,14 @@ impl ProbeUiApp {
             );
 
             ui.allocate_ui_with_layout(
-                egui::vec2(variant_w, 240.0),
+                egui::vec2(variant_w, 180.0),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
                     ui.label(egui::RichText::new(self.t(Msg::Variant)).strong().small());
                     let fam_index = sel_family;
                     egui::ScrollArea::vertical()
                         .id_salt("chip_list")
-                        .max_height(215.0)
+                        .max_height(155.0)
                         .show(ui, |ui| {
                             match fam_index.and_then(|i| self.chip_families.get(i)) {
                                 Some(fam) => {
