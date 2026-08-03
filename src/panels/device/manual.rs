@@ -2,7 +2,7 @@
 
 use eframe::egui;
 
-use crate::app::ProbeUiApp;
+use crate::app::{PackTab, ProbeUiApp};
 use crate::i18n::Msg;
 use crate::t;
 use crate::worker::WorkerCommand;
@@ -49,13 +49,22 @@ impl ProbeUiApp {
                     self.log_info(t!(self.lang, Msg::GeneratingFromPack, path.display()));
                     self.send(WorkerCommand::GeneratePack { path });
                 }
+            // 内置芯片包 / 外部芯片包 切换。
+            ui.separator();
+            let l_builtin = self.icon("🏢", Msg::PackBuiltin);
+            let l_external = self.icon("📦", Msg::PackExternal);
+            ui.selectable_value(&mut self.pack_tab, PackTab::Builtin, l_builtin);
+            ui.selectable_value(&mut self.pack_tab, PackTab::External, l_external);
         });
-
-        // 外部芯片包：导入的芯片独立于内置三级菜单，在此选择家族与型号。
-        self.external_pack_ui(ui);
 
         if !self.manual_target.is_empty() {
             ui.label(t!(self.lang, Msg::SelectedChip, self.manual_target));
+        }
+
+        // 外部芯片包视图：导入的芯片独立于内置三级菜单。
+        if self.pack_tab == PackTab::External {
+            self.external_pack_ui(ui);
+            return;
         }
 
         let filter = self.chip_search.trim().to_lowercase();

@@ -51,6 +51,8 @@ pub enum Msg {
     SearchModel,
     SearchHint,
     SelectedChip,
+    PackBuiltin,
+    PackExternal,
     ExternalPackSel,
     ExternalPackNone,
     ExternalPackHint,
@@ -339,6 +341,8 @@ const MSGS: &[(Msg, &str, &str)] = &[
     (Msg::SearchModel, "搜索型号:", "Search:"),
     (Msg::SearchHint, "如 stm32f103 / nrf52840", "e.g. stm32f103 / nrf52840"),
     (Msg::SelectedChip, "已选型号: {}", "Selected: {}"),
+    (Msg::PackBuiltin, "内置芯片包", "Built-in pack"),
+    (Msg::PackExternal, "外部芯片包", "External pack"),
     (Msg::ExternalPackSel, "外部芯片包:", "External pack:"),
     (Msg::ExternalPackNone, "（未导入，可在上方加载 YAML 或从 CMSIS 包生成）", "(nothing imported; load a YAML or generate from a CMSIS pack above)"),
     (

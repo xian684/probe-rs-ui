@@ -59,6 +59,15 @@ pub(crate) enum DeviceTab {
     Advanced,
 }
 
+/// 手动指定目标下『内置芯片包 / 外部芯片包』互斥切换。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PackTab {
+    /// 内置 probe-rs 芯片库（品牌/系列/型号三级联动）。
+    Builtin,
+    /// 通过 YAML / CMSIS Pack 导入的外部芯片。
+    External,
+}
+
 pub(crate) struct LogEntry {
     pub(crate) text: String,
     pub(crate) level: LogLevel,
@@ -93,6 +102,8 @@ pub struct ProbeUiApp {
     pub(crate) external_families: Vec<ChipFamilyInfo>,
     /// 外部芯片包下拉选中的家族索引。
     pub(crate) selected_external_family: Option<usize>,
+    /// 手动选型视图：内置芯片包 / 外部芯片包。
+    pub(crate) pack_tab: PackTab,
     pub(crate) selected_brand: Option<usize>,
     pub(crate) selected_family: Option<usize>,
     pub(crate) chip_search: String,
@@ -171,6 +182,7 @@ impl ProbeUiApp {
             chip_brands,
             external_families: Vec::new(),
             selected_external_family: None,
+            pack_tab: PackTab::Builtin,
             selected_brand: None,
             selected_family: None,
             chip_search: String::new(),

@@ -78,7 +78,7 @@ probe-rs-ui/
     │   ├── top.rs           Top bar: title, connection status, theme / language switchers
     │   ├── device/          Left device-detection panel
     │   │   ├── mod.rs       Entry: probe picker, connection mode, auto-detect, sub-panel tabs
-    │   │   ├── manual.rs    Manual target: search + brand/family/variant cascade + connect
+    │   │   ├── manual.rs    Manual target: built-in / external pack switch, search + cascade + connect
     │   │   ├── target_gen.rs Advanced chip config: CMSIS Pack → chip descriptions (generate / generate & import)
     │   │   └── info.rs      Target info box: chip & memory map after connect
     │   ├── central.rs       Central panel: flash / memory viewer / RTT tabs
