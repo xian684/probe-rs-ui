@@ -38,9 +38,12 @@ cargo build --release
 
 生成的可执行文件位于 `target/release/probe-rs-ui`（Windows 为 `probe-rs-ui.exe`），可直接双击运行。
 
-### Windows 构建包
+### Windows 构建包与 Release 发布
 
-推送至 `master` 后，GitHub Actions 会自动构建 Windows x86_64 的 `.zip` 包（可在 [Actions](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml) 页面下载 artifacts）。推送形如 `v1.0.0` 的 tag 时，还会自动创建 GitHub Release 并附带该 zip。
+推送至 `master` 后，GitHub Actions 会自动构建 Windows x86_64 的 `.zip` 包（可在 [Actions](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml) 页面下载 artifacts）。发布 Release 有两种方式：
+
+- **自动**：推送 `v*` 形式的 tag（如 `v1.0.0`），自动创建 GitHub Release 并附带 zip；
+- **手动**：在 Actions 页面手动运行该 workflow，填写「发布版本号」（如 `v0.2.0`），会自动打 tag 并发布 Release。
 
 ## 使用方法
 

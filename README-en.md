@@ -38,9 +38,12 @@ cargo build --release
 
 The executable is produced at `target/release/probe-rs-ui` (`probe-rs-ui.exe` on Windows). You can run it directly.
 
-### Windows package
+### Windows package & Release publishing
 
-Every push to `master` builds a `probe-rs-ui-windows-x86_64.zip` with GitHub Actions. Download it from the relevant run's artifacts on the repository [Actions page](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml). Pushing a `v*` tag (e.g. `v1.0.0`) also creates a GitHub Release with the zip attached.
+Every push to `master` builds a `probe-rs-ui-windows-x86_64.zip` with GitHub Actions. Download it from the relevant run's artifacts on the repository [Actions page](https://github.com/xian684/probe-rs-ui/actions/workflows/build-packages.yml). Two ways to publish a Release:
+
+- **Automatic**: push a `v*` tag (e.g. `v1.0.0`) — a GitHub Release is created automatically with the zip attached;
+- **Manual**: run the workflow from the Actions page and fill in a version tag (e.g. `v0.2.0`) — it tags and publishes the Release for you.
 
 ## Usage
 
