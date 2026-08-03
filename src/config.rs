@@ -44,6 +44,8 @@ pub struct AppConfig {
     pub tg_input: String,
     /// Target 生成器最近使用的输出目录。
     pub tg_output_dir: String,
+    /// 历史导入过的外部芯片包来源文件（YAML 描述或 CMSIS Pack），启动时自动恢复。
+    pub external_sources: Vec<String>,
     /// 窗口大小（宽、高）。
     pub window_size: Option<[f32; 2]>,
     /// 窗口位置（x、y）。
@@ -73,6 +75,7 @@ impl Default for AppConfig {
             mem_write_start: 0,
             tg_input: String::new(),
             tg_output_dir: String::new(),
+            external_sources: Vec::new(),
             window_size: None,
             window_pos: None,
         }

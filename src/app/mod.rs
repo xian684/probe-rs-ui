@@ -101,6 +101,8 @@ pub struct ProbeUiApp {
     pub(crate) chip_brands: Vec<ChipBrandInfo>,
     /// 通过加载 YAML / CMSIS Pack 导入的外部芯片族（独立于内置三级菜单）。
     pub(crate) external_families: Vec<ChipFamilyInfo>,
+    /// 历史导入过的外部芯片包来源文件路径（持久化，启动时自动恢复）。
+    pub(crate) external_sources: Vec<String>,
     /// 外部芯片包下拉选中的家族索引。
     pub(crate) selected_external_family: Option<usize>,
     /// 手动选型视图：内置芯片包 / 外部芯片包。
@@ -188,6 +190,7 @@ impl ProbeUiApp {
             chip_families,
             chip_brands,
             external_families: Vec::new(),
+            external_sources: Vec::new(),
             selected_external_family: None,
             pack_tab: PackTab::Builtin,
             selected_brand: None,
@@ -348,6 +351,17 @@ impl ProbeUiApp {
         };
         self.external_families.push(family);
         ChipMergeResult::Added
+    }
+
+    /// 记录一个外部芯片包来源文件路径（供下次启动自动恢复）。
+    ///
+    /// 重复路径不重复记录；空路径忽略。
+    pub(crate) fn record_external_source(&mut self, path: &std::path::Path) {
+        let p = path.display().to_string();
+        if p.trim().is_empty() || self.external_sources.contains(&p) {
+            return;
+        }
+        self.external_sources.push(p);
     }
 }
 

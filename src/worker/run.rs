@@ -119,6 +119,9 @@ pub(super) fn run(
                     WorkerCommand::GeneratePack { path } => {
                         handle_generate_pack(&mut ctx, &path, lang);
                     }
+                    WorkerCommand::RestoreExternal { path } => {
+                        handle_restore_external(&mut ctx, &path, lang);
+                    }
                     WorkerCommand::ArmSearch { keyword } => {
                         handle_arm_search(&mut ctx, &keyword, lang);
                     }
@@ -267,6 +270,21 @@ fn handle_load_chip_file(ctx: &mut Ctx, path: &Path, lang: Lang) {
 fn handle_generate_pack(ctx: &mut Ctx, path: &Path, lang: Lang) {
     let result = generate_from_pack(ctx.registry, path, lang);
     let _ = ctx.events.send(WorkerEvent::PackGenerated(result));
+}
+
+/// 启动恢复历史导入的外部芯片包来源：按扩展名分发给加载或生成。
+fn handle_restore_external(ctx: &mut Ctx, path: &Path, lang: Lang) {
+    let is_yaml = path
+        .extension()
+        .map(|e| e == "yaml" || e == "yml")
+        .unwrap_or(false);
+    if is_yaml {
+        let result = load_chip_file(ctx.registry, path, lang);
+        let _ = ctx.events.send(WorkerEvent::ChipFileLoaded(result));
+    } else {
+        let result = generate_from_pack(ctx.registry, path, lang);
+        let _ = ctx.events.send(WorkerEvent::PackGenerated(result));
+    }
 }
 
 /// 搜索 ARM 在线索引（Keil.pidx）。

@@ -98,6 +98,7 @@ pub enum Msg {
     TargetsGenerated,
     TargetFileWritten,
     TgLoadedToSelection,
+    RestoringExternalPacks,
     ArmIndexFailed,
     ArmGenerateFailed,
     ArmDownloadFailed,
@@ -462,6 +463,11 @@ const MSGS: &[(Msg, &str, &str)] = &[
         Msg::TgLoadedToSelection,
         "已将 {} 个芯片族加载到手动选型列表",
         "Loaded {} chip family(ies) into the manual selection list",
+    ),
+    (
+        Msg::RestoringExternalPacks,
+        "正在恢复 {} 个外部芯片包来源...",
+        "Restoring {} external chip pack source(s)...",
     ),
     (
         Msg::ArmIndexFailed,

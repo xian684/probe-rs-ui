@@ -38,6 +38,7 @@ impl ProbeUiApp {
                     .add_filter("YAML", &["yaml", "yml"])
                     .pick_file()
                 {
+                    self.record_external_source(&path);
                     self.log_info(t!(self.lang, Msg::LoadingChipFile, path.display()));
                     self.send(WorkerCommand::LoadChipFile { path });
                 }
@@ -46,6 +47,7 @@ impl ProbeUiApp {
                     .add_filter("CMSIS Pack", &["pack", "pdsc", "zip"])
                     .pick_file()
                 {
+                    self.record_external_source(&path);
                     self.log_info(t!(self.lang, Msg::GeneratingFromPack, path.display()));
                     self.send(WorkerCommand::GeneratePack { path });
                 }

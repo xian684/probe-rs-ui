@@ -112,9 +112,9 @@ impl ProbeUiApp {
     }
 
     /// 校验输入/输出并发送生成命令。
-    /// 校验输入/输出并发送生成命令。
     ///
-    /// `auto_load` 为 true 时生成后自动导入选型列表（worker 侧 auto_load=true）。
+    /// `auto_load` 为 true 时生成后自动导入选型列表（worker 侧 auto_load=true），
+    /// 并把输入源记录进 `external_sources` 供下次启动自动恢复。
     fn start_target_gen(&mut self, auto_load: bool) {
         let input = PathBuf::from(self.tg_input.trim());
         if !input.exists() {
@@ -122,6 +122,9 @@ impl ProbeUiApp {
             return;
         }
         let output_dir = PathBuf::from(self.tg_output_dir.trim());
+        if auto_load {
+            self.record_external_source(&input);
+        }
         self.tg_busy = true;
         self.tg_result = None;
         self.log_info(t!(self.lang, Msg::GeneratingFromPack, self.tg_input));

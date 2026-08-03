@@ -283,6 +283,8 @@ impl ProbeUiApp {
                 self.log_ok(t!(self.lang, Msg::ArmGenerated, n));
                 for family in &result.families {
                     if !family.output_file.is_empty() {
+                        // 落盘的 YAML 可作下次启动的恢复来源。
+                        self.record_external_source(std::path::Path::new(&family.output_file));
                         self.log_info(t!(
                             self.lang,
                             Msg::TargetFileWritten,

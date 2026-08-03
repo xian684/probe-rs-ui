@@ -146,6 +146,11 @@ pub enum WorkerCommand {
     GeneratePack {
         path: PathBuf,
     },
+    /// 启动时恢复历史导入过的外部芯片包来源文件：
+    /// YAML 走 `load_chip_file`，CMSIS Pack（.pack/.pdsc/.zip）走 `generate_from_pack`。
+    RestoreExternal {
+        path: PathBuf,
+    },
     /// 拉取 ARM 在线索引（Keil.pidx），按关键字过滤（空则全部）。
     ArmSearch {
         keyword: String,

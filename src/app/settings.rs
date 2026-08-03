@@ -5,7 +5,8 @@ use std::path::PathBuf;
 use eframe::egui;
 
 use crate::config::AppConfig;
-use crate::i18n::Lang;
+use crate::i18n::{Lang, Msg};
+use crate::t;
 use crate::worker::{BootMode, WorkerCommand};
 
 use super::{CentralTab, ProbeUiApp, ThemeMode};
@@ -59,6 +60,22 @@ impl ProbeUiApp {
         self.mem_write_start = cfg.mem_write_start;
         self.tg_input = cfg.tg_input;
         self.tg_output_dir = cfg.tg_output_dir;
+        // 恢复历史导入过的外部芯片包来源：逐个重新加载到 registry 并合并进选型列表。
+        self.external_sources = cfg.external_sources;
+        for src in &self.external_sources {
+            if !src.trim().is_empty() {
+                self.send(WorkerCommand::RestoreExternal {
+                    path: PathBuf::from(src),
+                });
+            }
+        }
+        if !self.external_sources.is_empty() {
+            self.log_info(t!(
+                self.lang,
+                Msg::RestoringExternalPacks,
+                self.external_sources.len()
+            ));
+        }
         self.send(WorkerCommand::SetLang(self.lang));
         if !self.firmware_root.trim().is_empty() {
             self.firmware_scanning = true;
@@ -118,6 +135,7 @@ impl ProbeUiApp {
             mem_write_start: self.mem_write_start,
             tg_input: self.tg_input.clone(),
             tg_output_dir: self.tg_output_dir.clone(),
+            external_sources: self.external_sources.clone(),
             window_size: self.win_size,
             window_pos: self.win_pos,
         }
