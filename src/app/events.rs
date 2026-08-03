@@ -28,6 +28,7 @@ impl ProbeUiApp {
             WorkerEvent::Connected(Ok(summary)) => {
                 self.connecting = false;
                 self.busy = false;
+                self.show_manual = false;
                 self.log_ok(t!(self.lang, Msg::ConnectedTo, summary.name));
                 self.connected = Some(summary);
                 if let Some(flash) = self
